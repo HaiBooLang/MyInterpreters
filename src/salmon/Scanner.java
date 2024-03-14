@@ -1,7 +1,9 @@
 package salmon;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 // 扫描器的核心是一个循环。从源码的第一个字符开始，扫描器计算出该字符属于哪个词素，并消费它和属于该词素的任何后续字符。
 // 当到达该词素的末尾时，扫描器会输出一个标记（词法单元 token）。
@@ -20,6 +22,29 @@ public class Scanner {
     private int current = 0;
     // line字段跟踪的是current所在的源文件行数，这样我们产生的标记就可以知道其位置。
     private int line = 1;
+    private static final Map<String, TokenType> keywords;
+
+    // 为了处理关键字，我们要查看标识符的词素是否是保留字之一。
+    // 如果是，我们就使用该关键字特有的标记类型。我们在map中定义保留字的集合。
+    static {
+        keywords = new HashMap<>();
+        keywords.put("and",    TokenType.AND);
+        keywords.put("class",  TokenType.CLASS);
+        keywords.put("else",   TokenType.ELSE);
+        keywords.put("false",  TokenType.FALSE);
+        keywords.put("for",    TokenType.FOR);
+        keywords.put("fun",    TokenType.FUN);
+        keywords.put("if",     TokenType.IF);
+        keywords.put("nil",    TokenType.NIL);
+        keywords.put("or",     TokenType.OR);
+        keywords.put("print",  TokenType.PRINT);
+        keywords.put("return", TokenType.RETURN);
+        keywords.put("super",  TokenType.SUPER);
+        keywords.put("this",   TokenType.THIS);
+        keywords.put("true",   TokenType.TRUE);
+        keywords.put("var",    TokenType.VAR);
+        keywords.put("while",  TokenType.WHILE);
+    }
 
     Scanner(String source) {
         this.source = source;
@@ -27,7 +52,7 @@ public class Scanner {
 
     // 扫描器通过自己的方式遍历源代码，添加标记，直到遍历完所有字符。
     // 然后，它在最后附加一个的 "end of file "标记。
-    List<Token> scanTokens() {
+    public List<Token> scanTokens() {
         while (!isAtEnd()) {
             // 我们正处于下一个词汇的开头。
             start = current;
@@ -112,9 +137,16 @@ public class Scanner {
             default:
                 // 为了识别数字词素的开头，我们会寻找任何一位数字。
                 // 为每个十进制数字添加case分支有点乏味，所以我们直接在默认分支中进行处理。
+                // ----
+                // 最大匹配原则——当两个语法规则都能匹配扫描器正在处理的一大块代码时，哪个规则相匹配的字符最多，就使用哪个规则。
+                // 最大匹配原则意味着，我们只有扫描完一个可能是标识符的片段，才能确认是否一个保留字。
+                // 毕竟，保留字也是一个标识符，只是一个已经被语言要求为自己所用的标识符。这也是保留字一词的由来。
+                // 所以我们首先假设任何以字母或下划线开头的词素都是一个标识符。
                 if (isDigit(c)) {
                     // 一旦我们知道当前在处理数字，我们就分支进入一个单独的方法消费剩余的字面量，跟字符串的处理类似。
                     processNumber();
+                } else if (isAlpha(c)) {
+                    processIdentifier();
                 } else {
                     // 错误的字符仍然会被前面调用的advance()方法消费。这一点很重要，这样我们就不会陷入无限循环了。
                     Salmon.error(line, "Unexpected character.");
@@ -164,6 +196,20 @@ public class Scanner {
         return source.charAt(current + 1);
     }
 
+    private boolean isDigit(char c) {
+        return c >= '0' && c <= '9';
+    }
+
+    private boolean isAlpha(char c) {
+        return (c >= 'a' && c <= 'z') ||
+                (c >= 'A' && c <= 'Z') ||
+                c == '_';
+    }
+
+    private boolean isAlphaNumeric(char c) {
+        return isAlpha(c) || isDigit(c);
+    }
+
     // 我们会一直消费字符，直到"结束该字符串。如果输入内容耗尽，我们也会进行优雅的处理，并报告一个对应的错误。
     // Lox支持多行字符串。这有利有弊，但禁止换行比允许换行更复杂一些，所以我把它们保留了下来。
     // 这意味着当我们在字符串内遇到新行时，我们也需要更新line值。
@@ -188,10 +234,6 @@ public class Scanner {
         addToken(TokenType.STRING, value);
     }
 
-    private boolean isDigit(char c) {
-        return c >= '0' && c <= '9';
-    }
-
     // 我们在字面量的整数部分中尽可能多地获取数字。
     // 然后我们寻找小数部分，也就是一个小数点(.)后面至少跟一个数字。
     // 如果确实有小数部分，同样地，我们也尽可能多地获取数字。
@@ -209,5 +251,16 @@ public class Scanner {
 
         // 最后，我们将词素转换为其对应的数值。我们的解释器使用Java的Double类型来表示数字，所以我们创建一个该类型的值。
         addToken(TokenType.NUMBER, Double.parseDouble(source.substring(start, current)));
+    }
+
+    private void processIdentifier() {
+        while (isAlphaNumeric(peek())) advance();
+
+        // 在我们扫描到标识符之后，要检查是否与map中的某些项匹配。
+        // 如果匹配的话，就使用关键字的标记类型。否则，就是一个普通的用户定义的标识符。
+        String text = source.substring(start, current);
+        TokenType type = keywords.get(text);
+        if (type == null) type = TokenType.IDENTIFIER;
+        addToken(type);
     }
 }

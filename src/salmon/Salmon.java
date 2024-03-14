@@ -7,7 +7,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Scanner;
 
 // Lox是一种脚本语言，这意味着它直接从源代码执行。
 public class Salmon {
@@ -60,7 +59,6 @@ public class Salmon {
         Scanner scanner = new Scanner(source);
         List<Token> tokens = scanner.scanTokens();
 
-        // For now, just print the tokens.
         for (Token token : tokens) {
             System.out.println(token);
         }
