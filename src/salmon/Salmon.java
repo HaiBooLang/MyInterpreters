@@ -1,4 +1,4 @@
-package lox;
+package salmon;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Scanner;
 
 // Lox是一种脚本语言，这意味着它直接从源代码执行。
-public class Lox {
+public class Salmon {
     // 我们将以此来确保我们不会尝试执行有已知错误的代码。
     static boolean hadError = false;
 
