@@ -1,9 +1,7 @@
 package lox;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 // 扫描器的核心是一个循环。从源码的第一个字符开始，扫描器计算出该字符属于哪个词素，并消费它和属于该词素的任何后续字符。
 // 当到达该词素的末尾时，扫描器会输出一个标记（词法单元 token）。
@@ -40,9 +38,67 @@ public class Scanner {
         return tokens;
     }
 
+    private void scanToken() {
+        char c = advance();
+        switch (c) {
+            // 如果每个词素只有一个字符长。您所需要做的就是消费下一个字符并为其选择一个 token 类型。
+            case '(': addToken(TokenType.LEFT_PAREN); break;
+            case ')': addToken(TokenType.RIGHT_PAREN); break;
+            case '{': addToken(TokenType.LEFT_BRACE); break;
+            case '}': addToken(TokenType.RIGHT_BRACE); break;
+            case ',': addToken(TokenType.COMMA); break;
+            case '.': addToken(TokenType.DOT); break;
+            case '-': addToken(TokenType.MINUS); break;
+            case '+': addToken(TokenType.PLUS); break;
+            case ';': addToken(TokenType.SEMICOLON); break;
+            case '*': addToken(TokenType.STAR); break;
+            // ！、<、>和=都可以与后面跟随的=来组合成其他相等和比较操作符。对于所有这些情况，我们都需要查看第二个字符。
+            case '!':
+                addToken(nextMatch('=') ? TokenType.BANG_EQUAL : TokenType.BANG);
+                break;
+            case '=':
+                addToken(nextMatch('=') ? TokenType.EQUAL_EQUAL : TokenType.EQUAL);
+                break;
+            case '<':
+                addToken(nextMatch('=') ? TokenType.LESS_EQUAL : TokenType.LESS);
+                break;
+            case '>':
+                addToken(nextMatch('=') ? TokenType.GREATER_EQUAL : TokenType.GREATER);
+                break;
+
+            default:
+                // 错误的字符仍然会被前面调用的advance()方法消费。这一点很重要，这样我们就不会陷入无限循环了。
+                Lox.error(line, "Unexpected character.");
+                break;
+        }
+    }
+
     // 用来告诉我们是否已消费完所有字符。
     private boolean isAtEnd() {
         return current >= source.length();
     }
 
+    // 获取源文件中的下一个字符并返回它。
+    private char advance() {
+        current++;
+        return source.charAt(current - 1);
+    }
+
+    private void addToken(TokenType type) {
+        addToken(type, null);
+    }
+
+    // 获取当前词素的文本并为其创建一个新 token。
+    private void addToken(TokenType type, Object literal) {
+        String text = source.substring(start, current);
+        tokens.add(new Token(type, text, literal, line));
+    }
+
+    private boolean nextMatch(char expected) {
+        if (isAtEnd()) return false;
+        if (source.charAt(current) != expected) return false;
+
+        current++;
+        return true;
+    }
 }
