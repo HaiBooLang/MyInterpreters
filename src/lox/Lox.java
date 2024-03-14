@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Scanner;
 
 // Lox是一种脚本语言，这意味着它直接从源代码执行。
