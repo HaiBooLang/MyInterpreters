@@ -10,8 +10,12 @@ import java.util.List;
 
 // Lox是一种脚本语言，这意味着它直接从源代码执行。
 public class Salmon {
+    // 我们把这个字段设置为静态的，这样在一个REPL会话中连续调用run()时就会重复使用同一个解释器。
+    private static final Interpreter interpreter = new Interpreter();
     // 我们将以此来确保我们不会尝试执行有已知错误的代码。
     static boolean hadError = false;
+    // 我们使用与RuntimeError关联的标记来告诉用户错误发生时正在执行哪一行代码。展示错误之后，runtimeError()会设置以下字段.
+    static boolean hadRuntimeError = false;
 
     public static void main(String[] args) throws IOException {
         if (args.length > 1) {
@@ -34,6 +38,7 @@ public class Salmon {
 
         // 在退出代码中指出错误
         if (hadError) System.exit(65);
+        if (hadRuntimeError) System.exit(70);
     }
 
     private static void runPrompt() throws IOException {
@@ -69,7 +74,8 @@ public class Salmon {
         // 如果出现语法错误则停止。
         if (hadError) return;
 
-        System.out.println(new AstPrinter().print(expression));
+        interpreter.interpret(expression);
+//        System.out.println("AST: " + new AstPrinter().print(expression));
     }
 
     // 我们的语言提供的处理错误的工具构成了其用户界面的很大一部分。
@@ -87,6 +93,11 @@ public class Salmon {
         } else {
             report(token.line, " at '" + token.lexeme + "'", message);
         }
+    }
+
+    static void runtimeError(RuntimeError error) {
+        System.err.println(error.getMessage() + "\n[line " + error.token.line + "]");
+        hadRuntimeError = true;
     }
 
     private static void report(int line, String where, String message) {

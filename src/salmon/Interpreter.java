@@ -103,9 +103,37 @@ class Interpreter implements Expr.Visitor<Object> {
 
     }
 
+    // visit方法是Interpreter类的核心部分，真正的工作是在这里进行的。
+    // 我们需要给它们包上一层皮，以便与程序的其他部分对接。解释器的公共API只是一种方法。
+    // 该方法会接收一个表达式对应的语法树，并对其进行计算。
+    // 如果成功了，evaluate()方法会返回一个对象作为结果值。interpret()方法将结果转为字符串并展示给用户。
+    void interpret(Expr expression) {
+        try {
+            Object value = evaluate(expression);
+            System.out.println(stringify(value));
+        } catch (RuntimeError error) {
+            Salmon.runtimeError(error);
+        }
+    }
+
     // 只是将表达式发送回解释器的访问者实现中
     private Object evaluate(Expr expr) {
         return expr.accept(this);
+    }
+
+    // 这是一段像isTruthy()一样的代码，它连接了Lox对象的用户视图和它们在Java中的内部表示。
+    private String stringify(Object object) {
+        if (object == null) return "nil";
+
+        if (object instanceof Double) {
+            String text = object.toString();
+            if (text.endsWith(".0")) {
+                text = text.substring(0, text.length() - 2);
+            }
+            return text;
+        }
+
+        return object.toString();
     }
 
     // “真实”指的是什么呢？我们需要简单地讨论一下西方哲学中的一个伟大问题：什么是真理？
