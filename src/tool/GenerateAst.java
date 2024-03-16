@@ -37,6 +37,7 @@ public class GenerateAst {
         writer.println("import java.util.List;");
         writer.println();
         writer.println("abstract class " + baseName + " {");
+        defineVisitor(writer, baseName, types);
 
         // 在基类内部，我们定义每个子类。
         for (String type : types) {
@@ -45,32 +46,55 @@ public class GenerateAst {
             defineType(writer, baseName, className, fields);
         }
 
+        // 定义抽象 accept() 方法。
+        writer.println();
+        writer.println("    abstract <R> R accept(Visitor<R> visitor);");
         writer.println("}");
         writer.close();
     }
 
     private static void defineType(PrintWriter writer, String baseName, String className, String fieldList) {
-        writer.println("  static class " + className + " extends " + baseName + " {");
+        writer.println("    static class " + className + " extends " + baseName + " {");
 
         // 为类定义了一个构造函数。
-        writer.println("    " + className + "(" + fieldList + ") {");
+        writer.println("        " + className + "(" + fieldList + ") {");
 
         // 为每个字段提供参数。
         String[] fields = fieldList.split(", ");
         for (String field : fields) {
             String name = field.split(" ")[1];
             // 在类体中对其初始化。
-            writer.println("      this." + name + " = " + name + ";");
+            writer.println("            this." + name + " = " + name + ";");
         }
 
-        writer.println("    }");
+        writer.println("        }");
+
+        // 每个子类都实现accept()方法，并调用其类型对应的visit方法。
+        writer.println();
+        writer.println("        @Override");
+        writer.println("        <R> R accept(Visitor<R> visitor) {");
+        writer.println("            return visitor.visit" + className + baseName + "(this);");
+        writer.println("        }");
 
         // 在类体中声明了每个字段。
         writer.println();
         for (String field : fields) {
-            writer.println("    final " + field + ";");
+            writer.println("        final " + field + ";");
         }
 
-        writer.println("  }");
+        writer.println("    }");
+    }
+
+    // 这个函数会生成visitor接口。
+    // 在这里，我们遍历所有的子类，并为每个子类声明一个visit方法。当我们以后定义新的表达式类型时，会自动包含这些内容。
+    private static void defineVisitor(PrintWriter writer, String baseName, List<String> types) {
+        writer.println("    interface Visitor<R> {");
+
+        for (String type : types) {
+            String typeName = type.split(":")[0].trim();
+            writer.println("        R visit" + typeName + baseName + "(" + typeName + " " + baseName.toLowerCase() + ");");
+        }
+
+        writer.println("    }");
     }
 }
