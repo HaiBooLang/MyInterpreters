@@ -3,6 +3,10 @@ package salmon;
 import java.util.List;
 
 public class Parser {
+    // 这是一个简单的哨兵类，我们用它来帮助解析器摆脱错误。
+    // error()方法是返回错误而不是抛出错误，因为我们希望解析器内的调用方法决定是否要跳脱出该错误。
+    // 有些解析错误发生在解析器不可能进入异常状态的地方，这时我们就不需要同步。在这些地方，我们只需要报告错误，然后继续解析。
+    private static class ParseError extends RuntimeException {}
     private final List<Token> tokens;
     private int current = 0;
 
@@ -139,6 +143,14 @@ public class Parser {
         return previous();
     }
 
+    // 检查下一个标记是否是预期的类型。
+    // 如果是，它就会消费该标记，一切都很顺利。如果是其它的标记，那么我们就遇到了错误。
+    private Token consume(TokenType type, String message) {
+        if (check(type)) return advance();
+
+        throw error(peek(), message);
+    }
+
     // isAtEnd()检查我们是否处理完了待解析的标记。
     private boolean isAtEnd() {
         return peek().type == TokenType.EOF;
@@ -152,5 +164,37 @@ public class Parser {
     // previous()会返回最近消费的标记。
     private Token previous() {
         return tokens.get(current - 1);
+    }
+
+    private ParseError error(Token token, String message) {
+        Salmon.error(token, message);
+        return new ParseError();
+    }
+
+    // 我们想要丢弃标记，直至达到下一条语句的开头。这个边界很容易发现——这也是我们选其作为边界的原因。
+    // 在分号之后，我们可能就结束了一条语句。大多数语句都通过一个关键字开头——for、if、return、var等等。
+    // 当下一个标记是其中之一时，我们可能就要开始一条新语句了。
+    // 该方法会不断丢弃标记，直到它发现一个语句的边界。在捕获一个ParseError后，我们会调用该方法，然后我们就有望回到同步状态。
+    // 当它工作顺利时，我们就已经丢弃了无论如何都可能会引起级联错误的语法标记，现在我们可以从下一条语句开始解析文件的其余部分。
+    private void synchronize() {
+        advance();
+
+        while (!isAtEnd()) {
+            if (previous().type == TokenType.SEMICOLON) return;
+
+            switch (peek().type) {
+                case CLASS:
+                case FUN:
+                case VAR:
+                case FOR:
+                case IF:
+                case WHILE:
+                case PRINT:
+                case RETURN:
+                    return;
+            }
+
+            advance();
+        }
     }
 }
