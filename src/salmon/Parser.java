@@ -14,6 +14,14 @@ public class Parser {
         this.tokens = tokens;
     }
 
+    Expr parse() {
+        try {
+            return expression();
+        } catch (ParseError error) {
+            return null;
+        }
+    }
+
     // expression     → equality ;
     private Expr expression() {
         return equality();
@@ -115,6 +123,10 @@ public class Parser {
             consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
             return new Expr.Grouping(expr);
         }
+
+        // 当解析器在每个语法规则的解析方法中下降时，它最终会进入primary()。
+        // 如果该方法中的case都不匹配，就意味着我们正面对一个不是表达式开头的语法标记。我们也需要处理这个错误。
+        throw error(peek(), "Expect expression.");
     }
 
     // 这个检查会判断当前的标记是否属于给定的类型之一。

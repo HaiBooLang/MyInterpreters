@@ -59,9 +59,17 @@ public class Salmon {
         Scanner scanner = new Scanner(source);
         List<Token> tokens = scanner.scanTokens();
 
-        for (Token token : tokens) {
-            System.out.println(token);
-        }
+//        for (Token token : tokens) {
+//            System.out.println(token);
+//        }
+
+        Parser parser = new Parser(tokens);
+        Expr expression = parser.parse();
+
+        // 如果出现语法错误则停止。
+        if (hadError) return;
+
+        System.out.println(new AstPrinter().print(expression));
     }
 
     // 我们的语言提供的处理错误的工具构成了其用户界面的很大一部分。
