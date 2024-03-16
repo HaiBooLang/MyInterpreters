@@ -10,24 +10,31 @@ class Interpreter implements Expr.Visitor<Object> {
 
         switch (expr.operator.type) {
             case GREATER -> {
+                checkNumberOperands(expr.operator, left, right);
                 return (double) left > (double) right;
             }
             case GREATER_EQUAL -> {
+                checkNumberOperands(expr.operator, left, right);
                 return (double) left >= (double) right;
             }
             case LESS -> {
+                checkNumberOperands(expr.operator, left, right);
                 return (double) left < (double) right;
             }
             case LESS_EQUAL -> {
+                checkNumberOperands(expr.operator, left, right);
                 return (double) left <= (double) right;
             }
             case MINUS -> {
+                checkNumberOperands(expr.operator, left, right);
                 return (double) left - (double) right;
             }
             case BANG_EQUAL -> {
+                checkNumberOperands(expr.operator, left, right);
                 return !isEqual(left, right);
             }
             case EQUAL_EQUAL -> {
+                checkNumberOperands(expr.operator, left, right);
                 return isEqual(left, right);
             }
             case PLUS -> {
@@ -39,11 +46,15 @@ class Interpreter implements Expr.Visitor<Object> {
                 if (left instanceof String && right instanceof String) {
                     return (String) left + (String) right;
                 }
+                // 由于+已经对数字和字符串进行重载，其中已经有检查类型的代码。我们需要做的就是在这两种情况都不匹配时失败。
+                throw new RuntimeError(expr.operator, "Operands must be two numbers or two strings.");
             }
             case SLASH -> {
+                checkNumberOperands(expr.operator, left, right);
                 return (double) left / (double) right;
             }
             case STAR -> {
+                checkNumberOperands(expr.operator, left, right);
                 return (double) left * (double) right;
             }
         }
@@ -73,14 +84,22 @@ class Interpreter implements Expr.Visitor<Object> {
         // 这表明，解释器正在进行后序遍历——每个节点在自己求值之前必须先对子节点求值。
         Object right = evaluate(expr.right);
 
-        return switch (expr.operator.type) {
-            case BANG -> !isTruthy(right);
-            // 子表达式结果必须是数字。因为我们在Java中无法静态地知道这一点，所以我们在执行操作之前先对其进行强制转换。
-            // 这个类型转换是在运行时对-求值时发生的。这就是将语言动态类型化的核心所在。
-            case MINUS -> -(double) right;
+        switch (expr.operator.type) {
+            case BANG -> {
+                return !isTruthy(right);
+            }
+            case MINUS -> {
+                // 子表达式结果必须是数字。因为我们在Java中无法静态地知道这一点，所以我们在执行操作之前先对其进行强制转换。
+                // 这个类型转换是在运行时对-求值时发生的。这就是将语言动态类型化的核心所在。
+                // 在进行强制转换之前，我们先自己检查对象的类型。
+                checkNumberOperand(expr.operator, right);
+                return -(double) right;
+            }
             // 遥不可及的。
-            default -> null;
-        };
+            default -> {
+                return null;
+            }
+        }
 
     }
 
@@ -102,5 +121,16 @@ class Interpreter implements Expr.Visitor<Object> {
         if (a == null) return false;
 
         return a.equals(b);
+    }
+
+    private void checkNumberOperand(Token operator, Object operand) {
+        if (operand instanceof Double) return;
+        throw new RuntimeError(operator, "Operand must be a number.");
+    }
+
+    private void checkNumberOperands(Token operator, Object left, Object right) {
+        if (left instanceof Double && right instanceof Double) return;
+
+        throw new RuntimeError(operator, "Operands must be numbers.");
     }
 }
