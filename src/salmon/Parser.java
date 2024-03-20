@@ -1,5 +1,6 @@
 package salmon;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Parser {
@@ -14,13 +15,44 @@ public class Parser {
         this.tokens = tokens;
     }
 
-    Expr parse() {
-        try {
-            return expression();
-        } catch (ParseError error) {
-            return null;
+    // program        → statement* EOF ;
+    // program是语法的起点，代表一个完整的Lox脚本或REPL输入项。程序是一个语句列表，后面跟着特殊的“文件结束”(EOF)标记。
+    // 强制性的结束标记可以确保解析器能够消费所有输入内容，而不会默默地忽略脚本结尾处错误的、未消耗的标记。
+    List<Stmt> parse() {
+        List<Stmt> statements = new ArrayList<>();
+        while (!isAtEnd()) {
+            statements.add(statement());
         }
+
+        return statements;
     }
+
+    // statement      → exprStmt
+    //                | printStmt ;
+    // 如果下一个标记看起来不像任何已知类型的语句，我们就认为它一定是一个表达式语句。
+    // 这是解析语句时典型的最终失败分支，因为我们很难通过第一个标记主动识别出一个表达式。
+    private Stmt statement() {
+        if (match(TokenType.PRINT)) return printStatement();
+
+        return expressionStatement();
+    }
+
+    //printStmt      → "print" expression ";" ;
+    // 因为我们已经匹配并消费了print标记本身，所以这里不需要重复消费。我们先解析随后的表达式，消费表示语句终止的分号，并生成语法树。
+    private Stmt printStatement() {
+        Expr value = expression();
+        consume(TokenType.SEMICOLON, "Expect ';' after value.");
+        return new Stmt.Print(value);
+    }
+
+    //exprStmt       → expression ";" ;
+    private Stmt expressionStatement() {
+        Expr expr = expression();
+        consume(TokenType.SEMICOLON, "Expect ';' after expression.");
+        return new Stmt.Expression(expr);
+    }
+
+
 
     // expression     → equality ;
     private Expr expression() {

@@ -69,13 +69,13 @@ public class Salmon {
 //        }
 
         Parser parser = new Parser(tokens);
-        Expr expression = parser.parse();
+        List<Stmt> statements = parser.parse();
 
         // 如果出现语法错误则停止。
         if (hadError) return;
 
-        interpreter.interpret(expression);
-//        System.out.println("AST: " + new AstPrinter().print(expression));
+        interpreter.interpret(statements);
+//        System.out.println("AST: " + new AstPrinter().print(statements));
     }
 
     // 我们的语言提供的处理错误的工具构成了其用户界面的很大一部分。

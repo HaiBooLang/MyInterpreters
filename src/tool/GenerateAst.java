@@ -25,6 +25,14 @@ public class GenerateAst {
                 "Literal  : Object value",
                 "Unary    : Token operator, Expr right"
         ));
+
+        // 语法中没有地方既允许使用表达式，也允许使用语句。
+        // 因为这两种语法是不相干的，所以我们不需要提供一个它们都继承的基类。
+        // 将表达式和语句拆分为单独的类结构，可使Java编译器帮助我们发现一些愚蠢的错误。
+        defineAst(outputDir, "Stmt", Arrays.asList(
+                "Expression : Expr expression",
+                "Print      : Expr expression"
+        ));
     }
 
     private static void defineAst(String outputDir, String baseName, List<String> types) throws IOException {
