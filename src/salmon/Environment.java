@@ -23,4 +23,14 @@ public class Environment {
     void define(String name, Object value) {
         values.put(name, value);
     }
+
+    // 赋值与定义的主要区别在于，赋值操作不允许创建新变量。如果环境的变量映射中不存在变量的键，那就是一个运行时错误。
+    void assign(Token name, Object value) {
+        if (values.containsKey(name.lexeme)) {
+            values.put(name.lexeme, value);
+            return;
+        }
+
+        throw new RuntimeError(name, "Undefined variable '" + name.lexeme + "'.");
+    }
 }

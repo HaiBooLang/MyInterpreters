@@ -3,6 +3,8 @@ package salmon;
 import java.util.ArrayList;
 import java.util.List;
 
+import static salmon.TokenType.*;
+
 public class Parser {
     // 这是一个简单的哨兵类，我们用它来帮助解析器摆脱错误。
     // error()方法是返回错误而不是抛出错误，因为我们希望解析器内的调用方法决定是否要跳脱出该错误。
@@ -40,7 +42,7 @@ public class Parser {
     //                | statement ;
     private Stmt declaration() {
         try {
-            if (match(TokenType.VAR)) return varDeclaration();
+            if (match(VAR)) return varDeclaration();
 
             return statement();
         } catch (ParseError error) {
@@ -53,14 +55,14 @@ public class Parser {
 
     // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
     private Stmt varDeclaration() {
-        Token name = consume(TokenType.IDENTIFIER, "Expect variable name.");
+        Token name = consume(IDENTIFIER, "Expect variable name.");
 
         Expr initializer = null;
-        if (match(TokenType.EQUAL)) {
+        if (match(EQUAL)) {
             initializer = expression();
         }
 
-        consume(TokenType.SEMICOLON, "Expect ';' after variable declaration.");
+        consume(SEMICOLON, "Expect ';' after variable declaration.");
         return new Stmt.Var(name, initializer);
     }
 
@@ -69,7 +71,7 @@ public class Parser {
     // 如果下一个标记看起来不像任何已知类型的语句，我们就认为它一定是一个表达式语句。
     // 这是解析语句时典型的最终失败分支，因为我们很难通过第一个标记主动识别出一个表达式。
     private Stmt statement() {
-        if (match(TokenType.PRINT)) return printStatement();
+        if (match(PRINT)) return printStatement();
 
         return expressionStatement();
     }
@@ -78,20 +80,41 @@ public class Parser {
     // 因为我们已经匹配并消费了print标记本身，所以这里不需要重复消费。我们先解析随后的表达式，消费表示语句终止的分号，并生成语法树。
     private Stmt printStatement() {
         Expr value = expression();
-        consume(TokenType.SEMICOLON, "Expect ';' after value.");
+        consume(SEMICOLON, "Expect ';' after value.");
         return new Stmt.Print(value);
     }
 
     // exprStmt       → expression ";" ;
     private Stmt expressionStatement() {
         Expr expr = expression();
-        consume(TokenType.SEMICOLON, "Expect ';' after expression.");
+        consume(SEMICOLON, "Expect ';' after expression.");
         return new Stmt.Expression(expr);
     }
 
-    // expression     → equality ;
+    // expression     → assignment ;
     private Expr expression() {
-        return equality();
+        return assignment();
+    }
+
+    // assignment     → IDENTIFIER "=" assignment
+    //                | equality ;
+    // 在创建赋值表达式节点之前，我们先查看左边的表达式，弄清楚它是什么类型的赋值目标。然后我们将右值表达式节点转换为左值的表示形式。
+    private Expr assignment() {
+        Expr expr = equality();
+
+        if (match(EQUAL)) {
+            Token equals = previous();
+            Expr value = assignment();
+
+            if (expr instanceof Expr.Variable) {
+                Token name = ((Expr.Variable)expr).name;
+                return new Expr.Assign(name, value);
+            }
+
+            error(equals, "Invalid assignment target.");
+        }
+
+        return expr;
     }
 
     // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
@@ -108,7 +131,7 @@ public class Parser {
         // 然后，规则中的( ... )*循环映射为一个while循环。
         // 在规则体中，我们必须先找到一个 != 或==标记。
         // 因此，如果我们没有看到其中任一标记，我们必须结束相等(不相等)运算符的序列。
-        while (match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
+        while (match(BANG_EQUAL, EQUAL_EQUAL)) {
             Token operator = previous();
             Expr right = comparison();
             expr = new Expr.Binary(expr, operator, right);
@@ -123,7 +146,7 @@ public class Parser {
     private Expr comparison() {
         Expr expr = term();
 
-        while (match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL)) {
+        while (match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)) {
             Token operator = previous();
             Expr right = term();
             expr = new Expr.Binary(expr, operator, right);
@@ -136,7 +159,7 @@ public class Parser {
     private Expr term() {
         Expr expr = factor();
 
-        while (match(TokenType.MINUS, TokenType.PLUS)) {
+        while (match(MINUS, PLUS)) {
             Token operator = previous();
             Expr right = factor();
             expr = new Expr.Binary(expr, operator, right);
@@ -149,7 +172,7 @@ public class Parser {
     private Expr factor() {
         Expr expr = unary();
 
-        while (match(TokenType.SLASH, TokenType.STAR)) {
+        while (match(SLASH, STAR)) {
             Token operator = previous();
             Expr right = unary();
             expr = new Expr.Binary(expr, operator, right);
@@ -164,7 +187,7 @@ public class Parser {
     // 将所有这些都包装到一元表达式语法树中，我们就完成了。
     // 否则，我们就达到了最高级别的优先级，即基本表达式。
     private Expr unary() {
-        if (match(TokenType.BANG, TokenType.MINUS)) {
+        if (match(BANG, MINUS)) {
             Token operator = previous();
             Expr right = unary();
             return new Expr.Unary(operator, right);
@@ -176,22 +199,22 @@ public class Parser {
     // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
     // 该规则中大部分都是终止符，可以直接进行解析。
     private Expr primary() {
-        if (match(TokenType.FALSE)) return new Expr.Literal(false);
-        if (match(TokenType.TRUE)) return new Expr.Literal(true);
-        if (match(TokenType.NIL)) return new Expr.Literal(null);
+        if (match(FALSE)) return new Expr.Literal(false);
+        if (match(TRUE)) return new Expr.Literal(true);
+        if (match(NIL)) return new Expr.Literal(null);
 
-        if (match(TokenType.NUMBER, TokenType.STRING)) {
+        if (match(NUMBER, STRING)) {
             return new Expr.Literal(previous().literal);
         }
 
-        if (match(TokenType.IDENTIFIER)) {
+        if (match(IDENTIFIER)) {
             return new Expr.Variable(previous());
         }
 
         // 当我们匹配了一个开头(并解析了里面的表达式后，我们必须找到一个)标记。如果没有找到，那就是一个错误。
-        if (match(TokenType.LEFT_PAREN)) {
+        if (match(LEFT_PAREN)) {
             Expr expr = expression();
-            consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
+            consume(RIGHT_PAREN, "Expect ')' after expression.");
             return new Expr.Grouping(expr);
         }
 
@@ -236,7 +259,7 @@ public class Parser {
 
     // isAtEnd()检查我们是否处理完了待解析的标记。
     private boolean isAtEnd() {
-        return peek().type == TokenType.EOF;
+        return peek().type == EOF;
     }
 
     // peek()方法返回我们还未消费的当前标记。
@@ -263,7 +286,7 @@ public class Parser {
         advance();
 
         while (!isAtEnd()) {
-            if (previous().type == TokenType.SEMICOLON) return;
+            if (previous().type == SEMICOLON) return;
 
             switch (peek().type) {
                 case CLASS:
