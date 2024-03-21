@@ -23,7 +23,8 @@ public class GenerateAst {
                 "Binary   : Expr left, Token operator, Expr right",
                 "Grouping : Expr expression",
                 "Literal  : Object value",
-                "Unary    : Token operator, Expr right"
+                "Unary    : Token operator, Expr right",
+                "Variable : Token name"
         ));
 
         // 语法中没有地方既允许使用表达式，也允许使用语句。
@@ -31,7 +32,8 @@ public class GenerateAst {
         // 将表达式和语句拆分为单独的类结构，可使Java编译器帮助我们发现一些愚蠢的错误。
         defineAst(outputDir, "Stmt", Arrays.asList(
                 "Expression : Expr expression",
-                "Print      : Expr expression"
+                "Print      : Expr expression",
+                "Var        : Token name, Expr initializer"
         ));
     }
 

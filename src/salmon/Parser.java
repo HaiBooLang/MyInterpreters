@@ -7,7 +7,9 @@ public class Parser {
     // 这是一个简单的哨兵类，我们用它来帮助解析器摆脱错误。
     // error()方法是返回错误而不是抛出错误，因为我们希望解析器内的调用方法决定是否要跳脱出该错误。
     // 有些解析错误发生在解析器不可能进入异常状态的地方，这时我们就不需要同步。在这些地方，我们只需要报告错误，然后继续解析。
-    private static class ParseError extends RuntimeException {}
+    private static class ParseError extends RuntimeException {
+    }
+
     private final List<Token> tokens;
     private int current = 0;
 
@@ -21,10 +23,45 @@ public class Parser {
     List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
         while (!isAtEnd()) {
-            statements.add(statement());
+            statements.add(declaration());
         }
 
         return statements;
+    }
+
+    // program        → declaration* EOF ;
+    //
+
+    //
+    // statement      → exprStmt
+    //                | printStmt ;
+
+    // declaration    → varDecl
+    //                | statement ;
+    private Stmt declaration() {
+        try {
+            if (match(TokenType.VAR)) return varDeclaration();
+
+            return statement();
+        } catch (ParseError error) {
+            // 当解析器进入恐慌模式时，它就是进行同步的正确位置。
+            // 该方法的整个主体都封装在一个try块中，以捕获解析器开始错误恢复时抛出的异常。这样可以让解析器跳转到解析下一个语句或声明的开头。
+            synchronize();
+            return null;
+        }
+    }
+
+    // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+    private Stmt varDeclaration() {
+        Token name = consume(TokenType.IDENTIFIER, "Expect variable name.");
+
+        Expr initializer = null;
+        if (match(TokenType.EQUAL)) {
+            initializer = expression();
+        }
+
+        consume(TokenType.SEMICOLON, "Expect ';' after variable declaration.");
+        return new Stmt.Var(name, initializer);
     }
 
     // statement      → exprStmt
@@ -37,7 +74,7 @@ public class Parser {
         return expressionStatement();
     }
 
-    //printStmt      → "print" expression ";" ;
+    // printStmt      → "print" expression ";" ;
     // 因为我们已经匹配并消费了print标记本身，所以这里不需要重复消费。我们先解析随后的表达式，消费表示语句终止的分号，并生成语法树。
     private Stmt printStatement() {
         Expr value = expression();
@@ -45,14 +82,12 @@ public class Parser {
         return new Stmt.Print(value);
     }
 
-    //exprStmt       → expression ";" ;
+    // exprStmt       → expression ";" ;
     private Stmt expressionStatement() {
         Expr expr = expression();
         consume(TokenType.SEMICOLON, "Expect ';' after expression.");
         return new Stmt.Expression(expr);
     }
-
-
 
     // expression     → equality ;
     private Expr expression() {
@@ -147,6 +182,10 @@ public class Parser {
 
         if (match(TokenType.NUMBER, TokenType.STRING)) {
             return new Expr.Literal(previous().literal);
+        }
+
+        if (match(TokenType.IDENTIFIER)) {
+            return new Expr.Variable(previous());
         }
 
         // 当我们匹配了一个开头(并解析了里面的表达式后，我们必须找到一个)标记。如果没有找到，那就是一个错误。
