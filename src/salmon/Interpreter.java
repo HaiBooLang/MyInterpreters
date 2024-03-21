@@ -5,6 +5,38 @@ import java.util.List;
 // 这个类声明它是一个访问者。访问方法的返回类型将是Object，即我们在Java代码中用来引用Lox值的根类。
 // 为了实现Visitor接口，我们需要为解析器生成的四个表达式树类中分别定义访问方法。
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
+    private Environment environment = new Environment();
+
+    // visit方法是Interpreter类的核心部分，真正的工作是在这里进行的。
+    // 我们需要给它们包上一层皮，以便与程序的其他部分对接。解释器的公共API只是一种方法。
+    // 该方法会接收一个表达式对应的语法树，并对其进行计算。
+    // 如果成功了，evaluate()方法会返回一个对象作为结果值。interpret()方法将结果转为字符串并展示给用户。
+    void interpret(List<Stmt> statements) {
+        try {
+            for (Stmt statement : statements) {
+                execute(statement);
+            }
+        } catch (RuntimeError error) {
+            Salmon.runtimeError(error);
+        }
+    }
+
+    @Override
+    public Void visitVarStmt(Stmt.Var stmt) {
+        Object value = null;
+        if (stmt.initializer != null) {
+            value = evaluate(stmt.initializer);
+        }
+
+        environment.define(stmt.name.lexeme, value);
+        return null;
+    }
+
+    @Override
+    public Object visitVariableExpr(Expr.Variable expr) {
+        return environment.get(expr.name);
+    }
+
     // 与表达式不同，语句不会产生值，因此visit方法的返回类型是Void.
     @Override
     public Void visitExpressionStmt(Stmt.Expression stmt) {
@@ -117,20 +149,6 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             }
         }
 
-    }
-
-    // visit方法是Interpreter类的核心部分，真正的工作是在这里进行的。
-    // 我们需要给它们包上一层皮，以便与程序的其他部分对接。解释器的公共API只是一种方法。
-    // 该方法会接收一个表达式对应的语法树，并对其进行计算。
-    // 如果成功了，evaluate()方法会返回一个对象作为结果值。interpret()方法将结果转为字符串并展示给用户。
-    void interpret(List<Stmt> statements) {
-        try {
-            for (Stmt statement : statements) {
-                execute(statement);
-            }
-        } catch (RuntimeError error) {
-            Salmon.runtimeError(error);
-        }
     }
 
     // 只是将表达式发送回解释器的访问者实现中
