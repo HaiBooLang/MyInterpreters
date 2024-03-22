@@ -69,12 +69,14 @@ public class Parser {
     // statement      → exprStmt
     //                | ifStmt
     //                | printStmt
+    //                | whileStmt
     //                | block ;
     // 如果下一个标记看起来不像任何已知类型的语句，我们就认为它一定是一个表达式语句。
     // 这是解析语句时典型的最终失败分支，因为我们很难通过第一个标记主动识别出一个表达式。
     private Stmt statement() {
         if (match(IF)) return ifStatement();
         if (match(PRINT)) return printStatement();
+        if (match(WHILE)) return whileStatement();
         if (match(LEFT_BRACE)) return new Stmt.Block(block());
 
         return expressionStatement();
@@ -102,6 +104,16 @@ public class Parser {
         Expr value = expression();
         consume(SEMICOLON, "Expect ';' after value.");
         return new Stmt.Print(value);
+    }
+
+    // whileStmt      → "while" "(" expression ")" statement ;
+    private Stmt whileStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'while'.");
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expect ')' after condition.");
+        Stmt body = statement();
+
+        return new Stmt.While(condition, body);
     }
 
     private List<Stmt> block() {
