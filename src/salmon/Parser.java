@@ -1,17 +1,12 @@
 package salmon;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static salmon.TokenType.*;
 
 public class Parser {
-    // 这是一个简单的哨兵类，我们用它来帮助解析器摆脱错误。
-    // error()方法是返回错误而不是抛出错误，因为我们希望解析器内的调用方法决定是否要跳脱出该错误。
-    // 有些解析错误发生在解析器不可能进入异常状态的地方，这时我们就不需要同步。在这些地方，我们只需要报告错误，然后继续解析。
-    private static class ParseError extends RuntimeException {
-    }
-
     private final List<Token> tokens;
     private int current = 0;
 
@@ -31,13 +26,6 @@ public class Parser {
         return statements;
     }
 
-    // program        → declaration* EOF ;
-    //
-
-    //
-    // statement      → exprStmt
-    //                | printStmt ;
-
     // declaration    → varDecl
     //                | statement ;
     private Stmt declaration() {
@@ -53,6 +41,8 @@ public class Parser {
         }
     }
 
+    // program        → declaration* EOF ;
+
     // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
     private Stmt varDeclaration() {
         Token name = consume(IDENTIFIER, "Expect variable name.");
@@ -67,6 +57,7 @@ public class Parser {
     }
 
     // statement      → exprStmt
+    //                | forStmt
     //                | ifStmt
     //                | printStmt
     //                | whileStmt
@@ -74,12 +65,66 @@ public class Parser {
     // 如果下一个标记看起来不像任何已知类型的语句，我们就认为它一定是一个表达式语句。
     // 这是解析语句时典型的最终失败分支，因为我们很难通过第一个标记主动识别出一个表达式。
     private Stmt statement() {
+        if (match(FOR)) return forStatement();
         if (match(IF)) return ifStatement();
         if (match(PRINT)) return printStatement();
         if (match(WHILE)) return whileStatement();
         if (match(LEFT_BRACE)) return new Stmt.Block(block());
 
         return expressionStatement();
+    }
+
+    // forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
+    //                  expression? ";"
+    //                  expression? ")" statement ;
+    private Stmt forStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'for'.");
+
+        // 接下来的第一个子句是初始化式。
+        Stmt initializer;
+        if (match(SEMICOLON)) {
+            initializer = null;
+        } else if (match(VAR)) {
+            initializer = varDeclaration();
+        } else {
+            initializer = expressionStatement();
+        }
+
+        // 接下来是条件表达式。
+        Expr condition = null;
+        if (!check(SEMICOLON)) {
+            condition = expression();
+        }
+        consume(SEMICOLON, "Expect ';' after loop condition.");
+
+        // 最后一个子句是增量语句。
+        Expr increment = null;
+        if (!check(RIGHT_PAREN)) {
+            increment = expression();
+        }
+        consume(RIGHT_PAREN, "Expect ')' after for clauses.");
+
+        // 剩下的就是循环主体了。
+        Stmt body = statement();
+
+        // 我们利用这些变量来合成表示for循环语义的语法树节点。
+        if (increment != null) {
+            // 如果存在增量子句的话，会在循环的每个迭代中在循环体结束之后执行。
+            // 我们用一个代码块来代替循环体，这个代码块中包含原始的循环体，后面跟一个执行增量子语句的表达式语句。
+            body = new Stmt.Block(Arrays.asList(body, new Stmt.Expression(increment)));
+        }
+
+        // 接下来，我们获取条件式和循环体，并通过基本的while语句构建对应的循环。
+        // 如果条件式被省略了，我们就使用true来创建一个无限循环。
+        if (condition == null) condition = new Expr.Literal(true);
+        body = new Stmt.While(condition, body);
+
+        // 最后，如果有初始化式，它会在整个循环之前运行一次。
+        if (initializer != null) {
+            body = new Stmt.Block(Arrays.asList(initializer, body));
+        }
+
+        return body;
     }
 
     // ifStmt         → "if" "(" expression ")" statement
@@ -150,7 +195,7 @@ public class Parser {
             Expr value = assignment();
 
             if (expr instanceof Expr.Variable) {
-                Token name = ((Expr.Variable)expr).name;
+                Token name = ((Expr.Variable) expr).name;
                 return new Expr.Assign(name, value);
             }
 
@@ -371,5 +416,11 @@ public class Parser {
 
             advance();
         }
+    }
+
+    // 这是一个简单的哨兵类，我们用它来帮助解析器摆脱错误。
+    // error()方法是返回错误而不是抛出错误，因为我们希望解析器内的调用方法决定是否要跳脱出该错误。
+    // 有些解析错误发生在解析器不可能进入异常状态的地方，这时我们就不需要同步。在这些地方，我们只需要报告错误，然后继续解析。
+    private static class ParseError extends RuntimeException {
     }
 }

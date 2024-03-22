@@ -14,16 +14,6 @@ import static salmon.TokenType.*;
 // 在Lox中，和大多数编程语言一样，该语法的规则非常简单，可以将其归为正则语言。
 // 如果你愿意，你可以非常精确地使用正则表达式来识别Lox的所有不同词组，而且还有一堆有趣的理论来支撑着为什么会这样以及它的意义。
 public class Scanner {
-    // 我们将原始的源代码存储为一个简单的字符串。
-    private final String source;
-    // 并且我们已经准备了一个列表来保存扫描时产生的标记。
-    private final List<Token> tokens = new ArrayList<>();
-    // start字段指向被扫描的词素中的第一个字符.
-    private int start = 0;
-    // current字段指向当前正在处理的字符。
-    private int current = 0;
-    // line字段跟踪的是current所在的源文件行数，这样我们产生的标记就可以知道其位置。
-    private int line = 1;
     private static final Map<String, TokenType> keywords;
 
     // 为了处理关键字，我们要查看标识符的词素是否是保留字之一。
@@ -47,6 +37,17 @@ public class Scanner {
         keywords.put("var", VAR);
         keywords.put("while", WHILE);
     }
+
+    // 我们将原始的源代码存储为一个简单的字符串。
+    private final String source;
+    // 并且我们已经准备了一个列表来保存扫描时产生的标记。
+    private final List<Token> tokens = new ArrayList<>();
+    // start字段指向被扫描的词素中的第一个字符.
+    private int start = 0;
+    // current字段指向当前正在处理的字符。
+    private int current = 0;
+    // line字段跟踪的是current所在的源文件行数，这样我们产生的标记就可以知道其位置。
+    private int line = 1;
 
     Scanner(String source) {
         this.source = source;
