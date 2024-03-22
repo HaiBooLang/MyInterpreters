@@ -32,6 +32,7 @@ public class GenerateAst {
         // 因为这两种语法是不相干的，所以我们不需要提供一个它们都继承的基类。
         // 将表达式和语句拆分为单独的类结构，可使Java编译器帮助我们发现一些愚蠢的错误。
         defineAst(outputDir, "Stmt", Arrays.asList(
+                "Block      : List<Stmt> statements",
                 "Expression : Expr expression",
                 "Print      : Expr expression",
                 "Var        : Token name, Expr initializer"

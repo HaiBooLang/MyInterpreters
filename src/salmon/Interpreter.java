@@ -21,6 +21,12 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
     }
 
+//    @Override
+    public Void visitBlockStmt(Stmt.Block stmt) {
+        executeBlock(stmt.statements, new Environment(environment));
+        return null;
+    }
+
     @Override
     public Void visitVarStmt(Stmt.Var stmt) {
         Object value = null;
@@ -166,6 +172,21 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     // 这类似于处理表达式的evaluate()方法，这是这里处理语句。
     private void execute(Stmt stmt) {
         stmt.accept(this);
+    }
+
+    // 这个新方法会在给定的环境上下文中执行一系列语句。在此之前，解释器中的 environment 字段总是指向相同的环境——全局环境。
+    // 现在，这个字段会指向当前环境，也就是与要执行的代码的最内层作用域相对应的环境。
+    void executeBlock(List<Stmt> statements, Environment environment) {
+        Environment previous = this.environment;
+        try {
+            this.environment = environment;
+
+            for (Stmt statement : statements) {
+                execute(statement);
+            }
+        } finally {
+            this.environment = previous;
+        }
     }
 
     // 这是一段像isTruthy()一样的代码，它连接了Lox对象的用户视图和它们在Java中的内部表示。
