@@ -80,6 +80,9 @@ public class Salmon {
         Resolver resolver = new Resolver(interpreter);
         resolver.resolve(statements);
 
+        // 如果出现解析错误则停止。
+        if (hadError) return;
+
         interpreter.interpret(statements);
 //        System.out.println("AST: " + new AstPrinter().print(statements));
     }

@@ -14,6 +14,10 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     // 作用域栈只用于局部块作用域。解析器不会跟踪在全局作用域的顶层声明的变量，因为它们在Lox中是更动态的。
     // 当解析一个变量时，如果我们在本地作用域栈中找不到它，我们就认为它一定是全局的。
     private final Stack<Map<String, Boolean>> scopes = new Stack<>();
+    // 这里执行了一个return语句，但它甚至根本不在函数内部。这是一个顶层代码。
+    // 我不知道用户认为会发生什么，但是我认为我们不希望Lox允许这种做法。
+    // 就像我们遍历语法树时跟踪作用域一样，我们也可以跟踪当前访问的代码是否在一个函数声明内部。
+    private FunctionType currentFunction = FunctionType.NONE;
 
 
     Resolver(Interpreter interpreter) {
@@ -68,7 +72,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         declare(stmt.name);
         define(stmt.name);
 
-        resolveFunction(stmt);
+        resolveFunction(stmt, FunctionType.FUNCTION);
         return null;
     }
 
@@ -101,6 +105,10 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     // return语句也是相同的。
     @Override
     public Void visitReturnStmt(Stmt.Return stmt) {
+        if (currentFunction == FunctionType.NONE) {
+            Salmon.error(stmt.keyword, "Can't return from top-level code.");
+        }
+
         if (stmt.value != null) {
             resolve(stmt.value);
         }
@@ -167,7 +175,9 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     // 在运行时，声明一个函数不会对函数体做任何处理。
     // 直到后续函数被调用时，才会触及主体。在静态分析中，我们会立即遍历函数体。
-    private void resolveFunction(Stmt.Function function) {
+    private void resolveFunction(Stmt.Function function, FunctionType type) {
+        FunctionType enclosingFunction = currentFunction;
+        currentFunction = type;
         beginScope();
         for (Token param : function.params) {
             declare(param);
@@ -175,6 +185,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         }
         resolve(function.body);
         endScope();
+        currentFunction = enclosingFunction;
     }
 
     // 我们从最内层的作用域开始，向外扩展，在每个map中寻找一个可以匹配的名称。
@@ -194,6 +205,12 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     private void declare(Token name) {
         if (scopes.isEmpty()) return;
         Map<String, Boolean> scope = scopes.peek();
+
+        // 我们确实允许在全局作用域内声明多个同名的变量，但在局部作用域内这样做可能是错误的。
+        if (scope.containsKey(name.lexeme)) {
+            Salmon.error(name, "Already variable with this name in this scope.");
+        }
+
         // 我们通过在作用域map中将其名称绑定到false来表明该变量“尚未就绪”。
         scope.put(name.lexeme, false);
     }
@@ -225,6 +242,11 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     private void endScope() {
         scopes.pop();
+    }
+
+    private enum FunctionType {
+        NONE,
+        FUNCTION
     }
 
 }
