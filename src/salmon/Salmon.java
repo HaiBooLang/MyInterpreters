@@ -74,6 +74,12 @@ public class Salmon {
         // 如果出现语法错误则停止。
         if (hadError) return;
 
+        // 如果前面的分析中存在任何错误，我们都不会运行解析器。如果代码有语法错误，它就不会运行，所以解析它的价值不大。
+        // 如果语法是干净的，我们就告诉解析器做该做的事。
+        // 解析器中有一个对解释器的引用，当它遍历变量时，会将解析数据直接放入解释器中。解释器后续运行时，它就具备了所需的一切数据。
+        Resolver resolver = new Resolver(interpreter);
+        resolver.resolve(statements);
+
         interpreter.interpret(statements);
 //        System.out.println("AST: " + new AstPrinter().print(statements));
     }

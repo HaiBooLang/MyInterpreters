@@ -1,7 +1,9 @@
 package salmon;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 // 这个类声明它是一个访问者。访问方法的返回类型将是Object，即我们在Java代码中用来引用Lox值的根类。
 // 为了实现Visitor接口，我们需要为解析器生成的四个表达式树类中分别定义访问方法。
@@ -10,6 +12,9 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     // 新加的globals字段则固定指向最外层的全局作用域。
     final Environment globals = new Environment();
     private Environment environment = globals;
+    // 我们要把解析信息存储在某个地方，我们会采用另一种常见的方法，将其存储在一个map中，将每个语法树节点与其解析的数据关联起来。
+    // 将这些数据存储在节点之外的好处之一就是，可以很容易地丢弃这部分数据——只需要清除map即可。
+    private final Map<Expr, Integer> locals = new HashMap<>();
 
     // 当我们实例化一个解释器时，我们将全局作用域中添加本地函数。
     Interpreter() {
@@ -99,13 +104,18 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     @Override
     public Object visitAssignExpr(Expr.Assign expr) {
         Object value = evaluate(expr.value);
-        environment.assign(expr.name, value);
+        Integer distance = locals.get(expr);
+        if (distance != null) {
+            environment.assignAt(distance, expr.name, value);
+        } else {
+            globals.assign(expr.name, value);
+        }
         return value;
     }
 
     @Override
     public Object visitVariableExpr(Expr.Variable expr) {
-        return environment.get(expr.name);
+        return lookUpVariable(expr.name, expr);
     }
 
     // 与表达式不同，语句不会产生值，因此visit方法的返回类型是Void.
@@ -260,6 +270,25 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             }
         }
 
+    }
+
+    // 让我们看看解析器有什么用处。每次访问一个变量时，它都会告诉解释器，在当前作用域和变量定义的作用域之间隔着多少层作用域。
+    // 在运行时，这正好对应于当前环境与解释器可以找到变量值的外围环境之间的environments数量。
+    // 解析器通过调用下面的方法将这个数字传递给解释器。
+    void resolve(Expr expr, int depth) {
+        locals.put(expr, depth);
+    }
+
+    // 这里有几件事要做。首先，我们在map中查找已解析的距离值。如果我们没有在map中找到变量对应的距离值，它一定是全局变量。
+    // 在这种情况下，我们直接在全局environment中查找。如果变量没有被定义，就会产生一个运行时错误。
+    // 如果我们确实查到了一个距离值，那这就是个局部变量，我们可以利用静态分析的结果。
+    private Object lookUpVariable(Token name, Expr expr) {
+        Integer distance = locals.get(expr);
+        if (distance != null) {
+            return environment.getAt(distance, name.lexeme);
+        } else {
+            return globals.get(name);
+        }
     }
 
     // 只是将表达式发送回解释器的访问者实现中

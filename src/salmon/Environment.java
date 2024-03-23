@@ -53,4 +53,24 @@ public class Environment {
 
         throw new RuntimeError(name, "Undefined variable '" + name.lexeme + "'.");
     }
+
+    Object getAt(int distance, String name) {
+        return ancestor(distance).values.get(name);
+    }
+
+    void assignAt(int distance, Token name, Object value) {
+        ancestor(distance).values.put(name.lexeme, value);
+    }
+
+    // 现在我们明确知道链路中的哪个环境中会包含该变量。我们使用下面的辅助方法直达这个环境。
+    // 该方法在环境链中经过确定的跳数之后，返回对应的环境。一旦我们有了环境，getAt()方法就可以直接返回对应环境map中的变量值。
+    // 甚至不需要检查变量是否存在——我们知道它是存在的，因为解析器之前已经确认过了。
+    Environment ancestor(int distance) {
+        Environment environment = this;
+        for (int i = 0; i < distance; i++) {
+            environment = environment.enclosing;
+        }
+
+        return environment;
+    }
 }
