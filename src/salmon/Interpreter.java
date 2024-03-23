@@ -118,7 +118,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     @Override
     public Void visitFunctionStmt(Stmt.Function stmt) {
         // 我们会接收一个函数语法节点——函数的编译时表示形式——然后将其转换为运行时表示形式。
-        SalmonFunction function = new SalmonFunction(stmt);
+        SalmonFunction function = new SalmonFunction(stmt, environment);
         // 函数声明与其它文本节点的不同之处在于，声明还会将结果对象绑定到一个新的变量。
         environment.define(stmt.name.lexeme, function);
         return null;
