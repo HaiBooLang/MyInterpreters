@@ -22,16 +22,18 @@ public class Parser {
         while (!isAtEnd()) {
             statements.add(declaration());
         }
-
         return statements;
     }
 
-    // declaration    → varDecl
+    // program        → declaration* EOF ;
+
+    // declaration    → funDecl
+    //                | varDecl
     //                | statement ;
     private Stmt declaration() {
         try {
+            if (match(FUN)) return function("function");
             if (match(VAR)) return varDeclaration();
-
             return statement();
         } catch (ParseError error) {
             // 当解析器进入恐慌模式时，它就是进行同步的正确位置。
@@ -41,7 +43,36 @@ public class Parser {
         }
     }
 
-    // program        → declaration* EOF ;
+    // funDecl        → "fun" function ;
+    // 你可能会对这里的kind参数感到疑惑。就像我们复用语法规则一样，稍后我们也会复用function()方法来解析类中的方法。
+    private Stmt.Function function(String kind) {
+        // 消费了标识符标记作为函数名称。
+        Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
+
+        // 解析参数列表和包裹着它们的一对小括号。
+        consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
+        List<Token> parameters = new ArrayList<>();
+        if (!check(RIGHT_PAREN)) {
+            do {
+                if (parameters.size() >= 255) {
+                    error(peek(), "Can't have more than 255 parameters.");
+                }
+
+                parameters.add(consume(IDENTIFIER, "Expect parameter name."));
+            } while (match(COMMA));
+        }
+        consume(RIGHT_PAREN, "Expect ')' after parameters.");
+
+        // 解析函数主体，并将其封装为一个函数节点。
+        consume(LEFT_BRACE, "Expect '{' before " + kind + " body.");
+        List<Stmt> body = block();
+        return new Stmt.Function(name, parameters, body);
+    }
+
+    // function       → IDENTIFIER "(" parameters? ")" block ;
+
+    // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
+
 
     // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
     private Stmt varDeclaration() {
