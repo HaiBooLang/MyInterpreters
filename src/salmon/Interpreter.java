@@ -6,7 +6,33 @@ import java.util.List;
 // 这个类声明它是一个访问者。访问方法的返回类型将是Object，即我们在Java代码中用来引用Lox值的根类。
 // 为了实现Visitor接口，我们需要为解析器生成的四个表达式树类中分别定义访问方法。
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
-    private Environment environment = new Environment();
+    // 解释器中的environment字段会随着进入和退出局部作用域而改变，它会跟随当前环境。
+    // 新加的globals字段则固定指向最外层的全局作用域。
+    final Environment globals = new Environment();
+    private Environment environment = globals;
+
+    // 当我们实例化一个解释器时，我们将全局作用域中添加本地函数。
+    Interpreter() {
+        // 这里有一个名为clock的变量，它的值是一个实现LoxCallable接口的Java匿名类。
+        // 这里的clock()函数不接受参数，所以其元数为0。
+        // call()方法的实现是直接调用Java函数并将结果转换为以秒为单位的double值。
+        globals.define("clock", new SalmonCallable() {
+            @Override
+            public int arity() {
+                return 0;
+            }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments) {
+                return (double) System.currentTimeMillis() / 1000.0;
+            }
+
+            @Override
+            public String toString() {
+                return "<native fn>";
+            }
+        });
+    }
 
     // visit方法是Interpreter类的核心部分，真正的工作是在这里进行的。
     // 我们需要给它们包上一层皮，以便与程序的其他部分对接。解释器的公共API只是一种方法。
