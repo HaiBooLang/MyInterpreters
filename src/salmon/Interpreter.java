@@ -1,5 +1,6 @@
 package salmon;
 
+import java.util.ArrayList;
 import java.util.List;
 
 // 这个类声明它是一个访问者。访问方法的返回类型将是Object，即我们在Java代码中用来引用Lox值的根类。
@@ -154,6 +155,29 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
         // 遥不可及的。
         return null;
+    }
+
+    @Override
+    public Object visitCallExpr(Expr.Call expr) {
+        Object callee = evaluate(expr.callee);
+
+        List<Object> arguments = new ArrayList<>();
+        for (Expr argument : expr.arguments) {
+            arguments.add(evaluate(argument));
+        }
+
+        if (!(callee instanceof SalmonCallable)) {
+            throw new RuntimeError(expr.paren, "Can only call functions and classes.");
+        }
+
+        SalmonCallable function = (SalmonCallable) callee;
+
+        if (arguments.size() != function.arity()) {
+            throw new RuntimeError(expr.paren, "Expected " +
+                    function.arity() + " arguments but got " + arguments.size() + ".");
+        }
+
+        return function.call(this, arguments);
     }
 
     // 在表达式中显式使用括号时产生的语法树节点。

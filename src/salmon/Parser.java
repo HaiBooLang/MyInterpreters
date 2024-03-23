@@ -295,7 +295,7 @@ public class Parser {
         return expr;
     }
 
-    // unary          → ( "!" | "-" ) unary | primary ;
+    // unary          → ( "!" | "-" ) unary | call ;
     // 我们先检查当前的标记以确认要如何进行解析。
     // 如果是!或-，我们一定有一个一元表达式。在这种情况下，我们使用当前的标记递归调用unary()来解析操作数。
     // 将所有这些都包装到一元表达式语法树中，我们就完成了。
@@ -307,8 +307,44 @@ public class Parser {
             return new Expr.Unary(operator, right);
         }
 
-        return primary();
+        return call();
     }
+
+    // call           → primary ( "(" arguments? ")" )* ;
+    private Expr call() {
+        Expr expr = primary();
+
+        while (true) {
+            if (match(LEFT_PAREN)) {
+                expr = finishCall(expr);
+            } else {
+                break;
+            }
+        }
+
+        return expr;
+    }
+
+    private Expr finishCall(Expr callee) {
+        List<Expr> arguments = new ArrayList<>();
+        if (!check(RIGHT_PAREN)) {
+            do {
+                // Lox的Java解释器实际上并不需要限制，但是设置一个最大的参数数量限制可以简化第三部分中的字节码解释器。
+                if (arguments.size() >= 255) {
+                    // 如果发现参数过多，这里的代码会报告一个错误，但是不会抛出该错误。
+                    // 在这里，解析器仍然处于完全有效的状态，只是发现了太多的参数。所以它会报告这个错误，并继续执行解析。
+                    error(peek(), "Can't have more than 255 arguments.");
+                }
+                arguments.add(expression());
+            } while (match(COMMA));
+        }
+
+        Token paren = consume(RIGHT_PAREN, "Expect ')' after arguments.");
+
+        return new Expr.Call(callee, paren, arguments);
+    }
+
+    // arguments      → expression ( "," expression )* ;
 
     // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
     // 该规则中大部分都是终止符，可以直接进行解析。
