@@ -54,6 +54,16 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitClassStmt(Stmt.Class stmt) {
+        environment.define(stmt.name.lexeme, null);
+        // 我们在当前环境中声明该类的名称。然后我们把类的语法节点转换为LoxClass，即类的运行时表示。
+        // 我们回过头来，将类对象存储在我们之前声明的变量中。这个二阶段的变量绑定过程允许在类的方法中引用其自身。
+        SalmonClass klass = new SalmonClass(stmt.name.lexeme);
+        environment.assign(stmt.name, klass);
+        return null;
+    }
+
+    @Override
     public Void visitWhileStmt(Stmt.While stmt) {
         while (isTruthy(evaluate(stmt.condition))) {
             execute(stmt.body);

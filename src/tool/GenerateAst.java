@@ -35,6 +35,7 @@ public class GenerateAst {
         // 将表达式和语句拆分为单独的类结构，可使Java编译器帮助我们发现一些愚蠢的错误。
         defineAst(outputDir, "Stmt", Arrays.asList(
                 "Block      : List<Stmt> statements",
+                "Class      : Token name, List<Stmt.Function> methods",
                 "Expression : Expr expression",
                 "Function   : Token name, List<Token> params, List<Stmt> body",
                 "If         : Expr condition, Stmt thenBranch, Stmt elseBranch",
