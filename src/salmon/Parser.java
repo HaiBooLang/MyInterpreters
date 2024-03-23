@@ -44,6 +44,8 @@ public class Parser {
     }
 
     // funDecl        → "fun" function ;
+    // function       → IDENTIFIER "(" parameters? ")" block ;
+    // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
     // 你可能会对这里的kind参数感到疑惑。就像我们复用语法规则一样，稍后我们也会复用function()方法来解析类中的方法。
     private Stmt.Function function(String kind) {
         // 消费了标识符标记作为函数名称。
@@ -69,11 +71,6 @@ public class Parser {
         return new Stmt.Function(name, parameters, body);
     }
 
-    // function       → IDENTIFIER "(" parameters? ")" block ;
-
-    // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
-
-
     // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
     private Stmt varDeclaration() {
         Token name = consume(IDENTIFIER, "Expect variable name.");
@@ -91,6 +88,7 @@ public class Parser {
     //                | forStmt
     //                | ifStmt
     //                | printStmt
+    //                | returnStmt
     //                | whileStmt
     //                | block ;
     // 如果下一个标记看起来不像任何已知类型的语句，我们就认为它一定是一个表达式语句。
@@ -99,6 +97,7 @@ public class Parser {
         if (match(FOR)) return forStatement();
         if (match(IF)) return ifStatement();
         if (match(PRINT)) return printStatement();
+        if (match(RETURN)) return returnStatement();
         if (match(WHILE)) return whileStatement();
         if (match(LEFT_BRACE)) return new Stmt.Block(block());
 
@@ -181,6 +180,21 @@ public class Parser {
         consume(SEMICOLON, "Expect ';' after value.");
         return new Stmt.Print(value);
     }
+
+    // returnStmt     → "return" expression? ";" ;
+    private Stmt returnStatement() {
+        Token keyword = previous();
+        Expr value = null;
+        // 因为很多不同的标记都可以引出一个表达式，所以很难判断是否存在返回值。
+        // 相反，我们检查它是否不存在。因为分号不能作为表达式的开始，如果下一个标记是分号，我们就知道一定没有返回值。
+        if (!check(SEMICOLON)) {
+            value = expression();
+        }
+
+        consume(SEMICOLON, "Expect ';' after return value.");
+        return new Stmt.Return(keyword, value);
+    }
+
 
     // whileStmt      → "while" "(" expression ")" statement ;
     private Stmt whileStatement() {
@@ -356,6 +370,7 @@ public class Parser {
         return expr;
     }
 
+    // arguments      → expression ( "," expression )* ;
     private Expr finishCall(Expr callee) {
         List<Expr> arguments = new ArrayList<>();
         if (!check(RIGHT_PAREN)) {
@@ -374,8 +389,6 @@ public class Parser {
 
         return new Expr.Call(callee, paren, arguments);
     }
-
-    // arguments      → expression ( "," expression )* ;
 
     // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
     // 该规则中大部分都是终止符，可以直接进行解析。

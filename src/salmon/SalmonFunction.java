@@ -4,6 +4,7 @@ import java.util.List;
 
 class SalmonFunction implements SalmonCallable {
     private final Stmt.Function declaration;
+
     SalmonFunction(Stmt.Function declaration) {
         this.declaration = declaration;
     }
@@ -28,9 +29,14 @@ class SalmonFunction implements SalmonCallable {
         for (int i = 0; i < declaration.params.size(); i++) {
             environment.define(declaration.params.get(i).lexeme, arguments.get(i));
         }
+        
+        try {
+            // 一旦函数的主体执行完毕，executeBlock()就会丢弃该函数的本地环境，并恢复调用该函数前的活跃环境。
+            interpreter.executeBlock(declaration.body, environment);
+        } catch (Return returnValue) {
+            return returnValue.value;
+        }
 
-        // 一旦函数的主体执行完毕，executeBlock()就会丢弃该函数的本地环境，并恢复调用该函数前的活跃环境。
-        interpreter.executeBlock(declaration.body, environment);
         return null;
     }
 }
