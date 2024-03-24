@@ -58,7 +58,14 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         environment.define(stmt.name.lexeme, null);
         // 我们在当前环境中声明该类的名称。然后我们把类的语法节点转换为LoxClass，即类的运行时表示。
         // 我们回过头来，将类对象存储在我们之前声明的变量中。这个二阶段的变量绑定过程允许在类的方法中引用其自身。
-        SalmonClass klass = new SalmonClass(stmt.name.lexeme);
+        Map<String, SalmonFunction> methods = new HashMap<>();
+        for (Stmt.Function method : stmt.methods) {
+            SalmonFunction function = new SalmonFunction(method, environment);
+            methods.put(method.name.lexeme, function);
+        }
+
+        SalmonClass klass = new SalmonClass(stmt.name.lexeme, methods);
+
         environment.assign(stmt.name, klass);
         return null;
     }

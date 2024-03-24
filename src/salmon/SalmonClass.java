@@ -1,12 +1,24 @@
 package salmon;
 
 import java.util.List;
+import java.util.Map;
 
 public class SalmonClass implements SalmonCallable {
     final String name;
+    // 实例存储状态，类存储行为。LoxInstance包含字段的map，而LoxClass包含方法的map。
+    private final Map<String, SalmonFunction> methods;
 
-    SalmonClass(String name) {
+    SalmonClass(String name, Map<String, SalmonFunction> methods) {
         this.name = name;
+        this.methods = methods;
+    }
+
+    SalmonFunction findMethod(String name) {
+        if (methods.containsKey(name)) {
+            return methods.get(name);
+        }
+
+        return null;
     }
 
     @Override
