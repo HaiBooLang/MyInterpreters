@@ -245,7 +245,7 @@ public class Parser {
         return assignment();
     }
 
-    // assignment     → IDENTIFIER "=" assignment
+    // assignment     → ( call "." )? IDENTIFIER "=" assignment
     //                | logic_or ;
     // 在创建赋值表达式节点之前，我们先查看左边的表达式，弄清楚它是什么类型的赋值目标。然后我们将右值表达式节点转换为左值的表示形式。
     private Expr assignment() {
@@ -258,6 +258,9 @@ public class Parser {
             if (expr instanceof Expr.Variable) {
                 Token name = ((Expr.Variable) expr).name;
                 return new Expr.Assign(name, value);
+            } else if (expr instanceof Expr.Get) {
+                Expr.Get get = (Expr.Get) expr;
+                return new Expr.Set(get.object, get.name, value);
             }
 
             error(equals, "Invalid assignment target.");
@@ -371,13 +374,16 @@ public class Parser {
         return call();
     }
 
-    // call           → primary ( "(" arguments? ")" )* ;
+    // call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
     private Expr call() {
         Expr expr = primary();
 
         while (true) {
             if (match(LEFT_PAREN)) {
                 expr = finishCall(expr);
+            } else if (match(DOT)) {
+                Token name = consume(IDENTIFIER, "Expect property name after '.'.");
+                expr = new Expr.Get(expr, name);
             } else {
                 break;
             }

@@ -2,7 +2,7 @@ package salmon;
 
 import java.util.List;
 
-public class SalmonClass implements SalmonCallable{
+public class SalmonClass implements SalmonCallable {
     final String name;
 
     SalmonClass(String name) {
