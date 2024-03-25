@@ -25,14 +25,17 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         this.interpreter = interpreter;
     }
 
-    @Override
-    public Void visitBlockStmt(Stmt.Block stmt) {
-        // 这里会开始一个新的作用域，遍历块中的语句，然后丢弃该作用域。
-        beginScope();
-        resolve(stmt.statements);
-        endScope();
-        return null;
-    }
+    // ---------------STMT---------------
+    // "Class      : Token name, Expr.Variable superclass, List<Stmt.Function> methods",
+    // "Function   : Token name, List<Token> params, List<Stmt> body",
+    // "Var        : Token name, Expr initializer",
+    // "If         : Expr condition, Stmt thenBranch, Stmt elseBranch",
+    // "Print      : Expr expression",
+    // "Return     : Token keyword, Expr value",
+    // "While      : Expr condition, Stmt body",
+    // "Block      : List<Stmt> statements",
+    // "Expression : Expr expression"
+    // ----------------------------------
 
     @Override
     public Void visitClassStmt(Stmt.Class stmt) {
@@ -80,37 +83,6 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
-    @Override
-    public Void visitVarStmt(Stmt.Var stmt) {
-        declare(stmt.name);
-        if (stmt.initializer != null) {
-            resolve(stmt.initializer);
-        }
-        define(stmt.name);
-        return null;
-    }
-
-    @Override
-    public Void visitVariableExpr(Expr.Variable expr) {
-        // 首先，我们要检查变量是否在其自身的初始化式中被访问。这也就是作用域map中的值发挥作用的地方。
-        // 如果当前作用域中存在该变量，但是它的值是false，意味着我们已经声明了它，但是还没有定义它。我们会报告一个错误出来。
-        if (!scopes.isEmpty() && scopes.peek().get(expr.name.lexeme) == Boolean.FALSE) {
-            Salmon.error(expr.name, "Can't read local variable in its own initializer.");
-        }
-
-        resolveLocal(expr, expr.name);
-        return null;
-    }
-
-    @Override
-    public Void visitAssignExpr(Expr.Assign expr) {
-        // 首先，我们解析右值的表达式，以防它还包含对其它变量的引用。
-        resolve(expr.value);
-        // 然后使用现有的 resolveLocal() 方法解析待赋值的变量。
-        resolveLocal(expr, expr.name);
-        return null;
-    }
-
     // 函数既绑定名称又引入了作用域。函数本身的名称被绑定在函数声明时所在的作用域中。
     // 当我们进入函数体时，我们还需要将其参数绑定到函数内部作用域中。
     // 与变量不同的是，我们在解析函数体之前，就急切地定义了这个名称。这样函数就可以在自己的函数体中递归地使用自身。
@@ -123,10 +95,13 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
-    // 一个表达式语句中包含一个需要遍历的表达式。
     @Override
-    public Void visitExpressionStmt(Stmt.Expression stmt) {
-        resolve(stmt.expression);
+    public Void visitVarStmt(Stmt.Var stmt) {
+        declare(stmt.name);
+        if (stmt.initializer != null) {
+            resolve(stmt.initializer);
+        }
+        define(stmt.name);
         return null;
     }
 
@@ -174,10 +149,69 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
+    @Override
+    public Void visitBlockStmt(Stmt.Block stmt) {
+        // 这里会开始一个新的作用域，遍历块中的语句，然后丢弃该作用域。
+        beginScope();
+        resolve(stmt.statements);
+        endScope();
+        return null;
+    }
+
+    // 一个表达式语句中包含一个需要遍历的表达式。
+    @Override
+    public Void visitExpressionStmt(Stmt.Expression stmt) {
+        resolve(stmt.expression);
+        return null;
+    }
+
+    // ---------------EXPR---------------
+    // "Grouping : Expr expression",
+    // "Assign   : Token name, Expr value",
+    // "Logical  : Expr left, Token operator, Expr right",
+    // "Binary   : Expr left, Token operator, Expr right",
+    // "Unary    : Token operator, Expr right",
+    // "Call     : Expr callee, Token paren, List<Expr> arguments",
+    // "Get      : Expr object, Token name",
+    // "Set      : Expr object, Token name, Expr value",
+    // "Literal  : Object value",
+    // "Variable : Token name",
+    // "This     : Token keyword",
+    // "Super    : Token keyword, Token method"
+
+    @Override
+    public Void visitGroupingExpr(Expr.Grouping expr) {
+        resolve(expr.expression);
+        return null;
+    }
+
+    @Override
+    public Void visitAssignExpr(Expr.Assign expr) {
+        // 首先，我们解析右值的表达式，以防它还包含对其它变量的引用。
+        resolve(expr.value);
+        // 然后使用现有的 resolveLocal() 方法解析待赋值的变量。
+        resolveLocal(expr, expr.name);
+        return null;
+    }
+
+    // 因为静态分析没有控制流或短路处理，逻辑表达式与其它的二元运算符是一样的。
+    @Override
+    public Void visitLogicalExpr(Expr.Logical expr) {
+        resolve(expr.left);
+        resolve(expr.right);
+        return null;
+    }
+
     // 我们的老朋友二元表达式。我们要遍历并解析两个操作数。
     @Override
     public Void visitBinaryExpr(Expr.Binary expr) {
         resolve(expr.left);
+        resolve(expr.right);
+        return null;
+    }
+
+    @Override
+    public Void visitUnaryExpr(Expr.Unary expr) {
         resolve(expr.right);
         return null;
     }
@@ -201,10 +235,9 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
-    // 括号表达式比较简单。
-    @Override
-    public Void visitGroupingExpr(Expr.Grouping expr) {
-        resolve(expr.expression);
+    public Void visitSetExpr(Expr.Set expr) {
+        resolve(expr.value);
+        resolve(expr.object);
         return null;
     }
 
@@ -214,28 +247,15 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
-    // 因为静态分析没有控制流或短路处理，逻辑表达式与其它的二元运算符是一样的。
     @Override
-    public Void visitLogicalExpr(Expr.Logical expr) {
-        resolve(expr.left);
-        resolve(expr.right);
-        return null;
-    }
-
-    public Void visitSetExpr(Expr.Set expr) {
-        resolve(expr.value);
-        resolve(expr.object);
-        return null;
-    }
-
-    @Override
-    public Void visitSuperExpr(Expr.Super expr) {
-        if (currentClass == ClassType.NONE) {
-            Salmon.error(expr.keyword, "Can't use 'super' outside of a class.");
-        } else if (currentClass != ClassType.SUBCLASS) {
-            Salmon.error(expr.keyword, "Can't use 'super' in a class with no superclass.");
+    public Void visitVariableExpr(Expr.Variable expr) {
+        // 首先，我们要检查变量是否在其自身的初始化式中被访问。这也就是作用域map中的值发挥作用的地方。
+        // 如果当前作用域中存在该变量，但是它的值是false，意味着我们已经声明了它，但是还没有定义它。我们会报告一个错误出来。
+        if (!scopes.isEmpty() && scopes.peek().get(expr.name.lexeme) == Boolean.FALSE) {
+            Salmon.error(expr.name, "Can't read local variable in its own initializer.");
         }
-        resolveLocal(expr, expr.keyword);
+
+        resolveLocal(expr, expr.name);
         return null;
     }
 
@@ -250,12 +270,18 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
-    // 接下来是最后一个节点，我们解析它的一个操作数。
     @Override
-    public Void visitUnaryExpr(Expr.Unary expr) {
-        resolve(expr.right);
+    public Void visitSuperExpr(Expr.Super expr) {
+        if (currentClass == ClassType.NONE) {
+            Salmon.error(expr.keyword, "Can't use 'super' outside of a class.");
+        } else if (currentClass != ClassType.SUBCLASS) {
+            Salmon.error(expr.keyword, "Can't use 'super' in a class with no superclass.");
+        }
+        resolveLocal(expr, expr.keyword);
         return null;
     }
+
+    // ----------------------------------
 
     // 在运行时，声明一个函数不会对函数体做任何处理。
     // 直到后续函数被调用时，才会触及主体。在静态分析中，我们会立即遍历函数体。
@@ -310,6 +336,10 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         scopes.push(new HashMap<String, Boolean>());
     }
 
+    private void endScope() {
+        scopes.pop();
+    }
+
     private void resolve(Stmt stmt) {
         stmt.accept(this);
     }
@@ -322,10 +352,6 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         for (Stmt statement : statements) {
             resolve(statement);
         }
-    }
-
-    private void endScope() {
-        scopes.pop();
     }
 
     private enum FunctionType {

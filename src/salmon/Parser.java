@@ -58,6 +58,29 @@ public class Parser {
     // primary        → "true" | "false" | "nil" | "this"
     //                | NUMBER | STRING | IDENTIFIER | "(" expression ")"
     //                | "super" "." IDENTIFIER ;
+    // ---------------EXPR---------------
+    // "Grouping : Expr expression",
+    // "Assign   : Token name, Expr value",
+    // "Logical  : Expr left, Token operator, Expr right",
+    // "Binary   : Expr left, Token operator, Expr right",
+    // "Unary    : Token operator, Expr right",
+    // "Call     : Expr callee, Token paren, List<Expr> arguments",
+    // "Get      : Expr object, Token name",
+    // "Set      : Expr object, Token name, Expr value",
+    // "Literal  : Object value",
+    // "Variable : Token name",
+    // "This     : Token keyword",
+    // "Super    : Token keyword, Token method"
+    // ---------------STMT---------------
+    // "Class      : Token name, Expr.Variable superclass, List<Stmt.Function> methods",
+    // "Function   : Token name, List<Token> params, List<Stmt> body",
+    // "Var        : Token name, Expr initializer",
+    // "If         : Expr condition, Stmt thenBranch, Stmt elseBranch",
+    // "Print      : Expr expression",
+    // "Return     : Token keyword, Expr value",
+    // "While      : Expr condition, Stmt body",
+    // "Block      : List<Stmt> statements",
+    // "Expression : Expr expression"
     // ----------------------------------
 
     // program        → statement* EOF ;
