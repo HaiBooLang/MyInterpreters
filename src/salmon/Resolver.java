@@ -47,7 +47,15 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         }
 
         if (stmt.superclass != null) {
+            currentClass = ClassType.SUBCLASS;
             resolve(stmt.superclass);
+        }
+
+        // 如果该类声明有超类，那么我们就在其所有方法的外围创建一个新的作用域。
+        // 在这个作用域中，我们会定义名称super。一旦我们完成了对该类中方法的分析，就丢弃这个作用域。
+        if (stmt.superclass != null) {
+            beginScope();
+            scopes.peek().put("super", true);
         }
 
         // 在我们开始分析方法体之前，我们推入一个新的作用域，并在其中像定义变量一样定义“this”。然后，当我们完成后，会丢弃这个外围作用域。
@@ -64,6 +72,8 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
             resolveFunction(method, declaration);
         }
         endScope();
+
+        if (stmt.superclass != null) endScope();
 
         currentClass = enclosingClass;
 
@@ -219,6 +229,17 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitSuperExpr(Expr.Super expr) {
+        if (currentClass == ClassType.NONE) {
+            Salmon.error(expr.keyword, "Can't use 'super' outside of a class.");
+        } else if (currentClass != ClassType.SUBCLASS) {
+            Salmon.error(expr.keyword, "Can't use 'super' in a class with no superclass.");
+        }
+        resolveLocal(expr, expr.keyword);
+        return null;
+    }
+
+    @Override
     public Void visitThisExpr(Expr.This expr) {
         if (currentClass == ClassType.NONE) {
             Salmon.error(expr.keyword, "Can't use 'this' outside of a class.");
@@ -316,7 +337,8 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     private enum ClassType {
         NONE,
-        CLASS
+        CLASS,
+        SUBCLASS
     }
 
 }

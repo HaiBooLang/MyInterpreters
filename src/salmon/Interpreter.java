@@ -65,6 +65,14 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
 
         environment.define(stmt.name.lexeme, null);
+
+        // 当我们执行子类定义时，创建一个新环境。在这个环境中，我们保存指向超类的引用。
+        // 然后我们为每个方法创建LoxFunction。这些函数将捕获当前环境作为其闭包，像我们需要的那样维系着超类。
+        if (stmt.superclass != null) {
+            environment = new Environment(environment);
+            environment.define("super", superclass);
+        }
+
         // 我们在当前环境中声明该类的名称。然后我们把类的语法节点转换为LoxClass，即类的运行时表示。
         // 我们回过头来，将类对象存储在我们之前声明的变量中。这个二阶段的变量绑定过程允许在类的方法中引用其自身。
         Map<String, SalmonFunction> methods = new HashMap<>();
@@ -74,6 +82,10 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
 
         SalmonClass klass = new SalmonClass(stmt.name.lexeme, (SalmonClass)superclass, methods);
+
+        if (superclass != null) {
+            environment = environment.enclosing;
+        }
 
         environment.assign(stmt.name, klass);
         return null;
@@ -111,6 +123,19 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         Object value = evaluate(expr.value);
         ((SalmonInstance) object).set(expr.name, value);
         return value;
+    }
+
+    @Override
+    public Object visitSuperExpr(Expr.Super expr) {
+        int distance = locals.get(expr);
+        SalmonClass superclass = (SalmonClass)environment.getAt(distance, "super");
+        // 将距离偏移1，在那个内部环境中查找“this”。
+        SalmonInstance object = (SalmonInstance)environment.getAt(distance - 1, "this");
+        SalmonFunction method = superclass.findMethod(expr.method.lexeme);
+        if (method == null) {
+            throw new RuntimeError(expr.method, "Undefined property '" + expr.method.lexeme + "'.");
+        }
+        return method.bind(object);
     }
 
     @Override

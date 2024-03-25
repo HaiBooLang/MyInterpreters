@@ -24,9 +24,7 @@ public class Parser {
         }
         return statements;
     }
-
-    // program        → declaration* EOF ;
-
+    
     // declaration    → classDecl
     //                | funDecl
     //                | varDecl
@@ -83,10 +81,11 @@ public class Parser {
         List<Token> parameters = new ArrayList<>();
         if (!check(RIGHT_PAREN)) {
             do {
+                // Lox的Java解释器实际上并不需要限制，但是设置一个最大的参数数量限制可以简化第三部分中的字节码解释器。
                 if (parameters.size() >= 255) {
+                    // 如果发现参数过多，这里的代码会报告一个错误，但是不会抛出该错误，并继续执行解析（解析器仍然处于完全有效的状态）。
                     error(peek(), "Can't have more than 255 parameters.");
                 }
-
                 parameters.add(consume(IDENTIFIER, "Expect parameter name."));
             } while (match(COMMA));
         }
@@ -118,8 +117,6 @@ public class Parser {
     //                | returnStmt
     //                | whileStmt
     //                | block ;
-    // 如果下一个标记看起来不像任何已知类型的语句，我们就认为它一定是一个表达式语句。
-    // 这是解析语句时典型的最终失败分支，因为我们很难通过第一个标记主动识别出一个表达式。
     private Stmt statement() {
         if (match(FOR)) return forStatement();
         if (match(IF)) return ifStatement();
@@ -128,6 +125,8 @@ public class Parser {
         if (match(WHILE)) return whileStatement();
         if (match(LEFT_BRACE)) return new Stmt.Block(block());
 
+        // 如果下一个标记看起来不像任何已知类型的语句，我们就认为它一定是一个表达式语句。
+        // 这是解析语句时典型的最终失败分支，因为我们很难通过第一个标记主动识别出一个表达式。
         return expressionStatement();
     }
 
@@ -410,8 +409,7 @@ public class Parser {
             do {
                 // Lox的Java解释器实际上并不需要限制，但是设置一个最大的参数数量限制可以简化第三部分中的字节码解释器。
                 if (arguments.size() >= 255) {
-                    // 如果发现参数过多，这里的代码会报告一个错误，但是不会抛出该错误。
-                    // 在这里，解析器仍然处于完全有效的状态，只是发现了太多的参数。所以它会报告这个错误，并继续执行解析。
+                    // 如果发现参数过多，这里的代码会报告一个错误，但是不会抛出该错误，并继续执行解析（解析器仍然处于完全有效的状态）。
                     error(peek(), "Can't have more than 255 arguments.");
                 }
                 arguments.add(expression());
@@ -423,14 +421,16 @@ public class Parser {
         return new Expr.Call(callee, paren, arguments);
     }
 
-    // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
+    // primary        → "true" | "false" | "nil" | "this"
+    //                | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+    //                | "super" "." IDENTIFIER ;
     // 该规则中大部分都是终止符，可以直接进行解析。
     private Expr primary() {
-        if (match(NUMBER, STRING)) return new Expr.Literal(previous().literal);
         if (match(TRUE)) return new Expr.Literal(true);
         if (match(FALSE)) return new Expr.Literal(false);
         if (match(NIL)) return new Expr.Literal(null);
         if (match(THIS)) return new Expr.This(previous());
+        if (match(NUMBER, STRING)) return new Expr.Literal(previous().literal);
         if (match(IDENTIFIER)) return new Expr.Variable(previous());
 
         // 当我们匹配了一个开头(并解析了里面的表达式后，我们必须找到一个)标记。如果没有找到，那就是一个错误。
@@ -438,6 +438,13 @@ public class Parser {
             Expr expr = expression();
             consume(RIGHT_PAREN, "Expect ')' after expression.");
             return new Expr.Grouping(expr);
+        }
+
+        if (match(SUPER)) {
+            Token keyword = previous();
+            consume(DOT, "Expect '.' after 'super'.");
+            Token method = consume(IDENTIFIER, "Expect superclass method name.");
+            return new Expr.Super(keyword, method);
         }
 
         // 当解析器在每个语法规则的解析方法中下降时，它最终会进入primary()。
