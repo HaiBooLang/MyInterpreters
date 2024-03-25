@@ -11,10 +11,10 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     // 解释器中的environment字段会随着进入和退出局部作用域而改变，它会跟随当前环境。
     // 新加的globals字段则固定指向最外层的全局作用域。
     final Environment globals = new Environment();
-    private Environment environment = globals;
     // 我们要把解析信息存储在某个地方，我们会采用另一种常见的方法，将其存储在一个map中，将每个语法树节点与其解析的数据关联起来。
     // 将这些数据存储在节点之外的好处之一就是，可以很容易地丢弃这部分数据——只需要清除map即可。
     private final Map<Expr, Integer> locals = new HashMap<>();
+    private Environment environment = globals;
 
     // 当我们实例化一个解释器时，我们将全局作用域中添加本地函数。
     Interpreter() {
@@ -81,7 +81,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             methods.put(method.name.lexeme, function);
         }
 
-        SalmonClass klass = new SalmonClass(stmt.name.lexeme, (SalmonClass)superclass, methods);
+        SalmonClass klass = new SalmonClass(stmt.name.lexeme, (SalmonClass) superclass, methods);
 
         if (superclass != null) {
             environment = environment.enclosing;
@@ -128,9 +128,9 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     @Override
     public Object visitSuperExpr(Expr.Super expr) {
         int distance = locals.get(expr);
-        SalmonClass superclass = (SalmonClass)environment.getAt(distance, "super");
+        SalmonClass superclass = (SalmonClass) environment.getAt(distance, "super");
         // 将距离偏移1，在那个内部环境中查找“this”。
-        SalmonInstance object = (SalmonInstance)environment.getAt(distance - 1, "this");
+        SalmonInstance object = (SalmonInstance) environment.getAt(distance - 1, "this");
         SalmonFunction method = superclass.findMethod(expr.method.lexeme);
         if (method == null) {
             throw new RuntimeError(expr.method, "Undefined property '" + expr.method.lexeme + "'.");

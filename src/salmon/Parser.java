@@ -14,6 +14,52 @@ public class Parser {
         this.tokens = tokens;
     }
 
+    // --------Rules for grammars--------
+    // program        → statement* EOF ;
+    // declaration    → classDecl
+    //                | funDecl
+    //                | varDecl
+    //                | statement ;
+    // classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )?
+    //                  "{" function* "}" ;
+    // funDecl        → "fun" function ;
+    // function       → IDENTIFIER "(" parameters? ")" block ;
+    // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
+    // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+    // statement      → forStmt
+    //                | ifStmt
+    //                | printStmt
+    //                | returnStmt
+    //                | whileStmt
+    //                | block
+    //                | exprStmt;
+    // forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
+    //                  expression? ";"
+    //                  expression? ")" statement ;
+    // ifStmt         → "if" "(" expression ")" statement
+    //                ( "else" statement )? ;
+    // printStmt      → "print" expression ";" ;
+    // returnStmt     → "return" expression? ";" ;
+    // whileStmt      → "while" "(" expression ")" statement ;
+    // block          → "{" declaration* "}" ;
+    // exprStmt       → expression ";" ;
+    // expression     → assignment ;
+    // assignment     → ( call "." )? IDENTIFIER "=" assignment
+    //                | logic_or ;
+    // logic_or       → logic_and ( "or" logic_and )* ;
+    // logic_and      → equality ( "and" equality )* ;
+    // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+    // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+    // term           → factor ( ( "-" | "+" ) factor )* ;
+    // factor         → unary ( ( "/" | "*" ) unary )* ;
+    // unary          → ( "!" | "-" ) unary | call ;
+    // call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
+    // arguments      → expression ( "," expression )* ;
+    // primary        → "true" | "false" | "nil" | "this"
+    //                | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+    //                | "super" "." IDENTIFIER ;
+    // ----------------------------------
+
     // program        → statement* EOF ;
     // program是语法的起点，代表一个完整的Lox脚本或REPL输入项。程序是一个语句列表，后面跟着特殊的“文件结束”(EOF)标记。
     // 强制性的结束标记可以确保解析器能够消费所有输入内容，而不会默默地忽略脚本结尾处错误的、未消耗的标记。
@@ -24,7 +70,7 @@ public class Parser {
         }
         return statements;
     }
-    
+
     // declaration    → classDecl
     //                | funDecl
     //                | varDecl
@@ -110,13 +156,13 @@ public class Parser {
         return new Stmt.Var(name, initializer);
     }
 
-    // statement      → exprStmt
-    //                | forStmt
+    // statement      → forStmt
     //                | ifStmt
     //                | printStmt
     //                | returnStmt
     //                | whileStmt
-    //                | block ;
+    //                | block
+    //                | exprStmt;
     private Stmt statement() {
         if (match(FOR)) return forStatement();
         if (match(IF)) return ifStatement();
@@ -232,6 +278,7 @@ public class Parser {
         return new Stmt.While(condition, body);
     }
 
+    // block          → "{" declaration* "}" ;
     private List<Stmt> block() {
         List<Stmt> statements = new ArrayList<>();
 

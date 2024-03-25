@@ -4,10 +4,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class SalmonInstance {
-    private SalmonClass klass;
     // map中的每个键是一个属性名称，对应的值就是该属性的值。
     // 实例存储状态，类存储行为。LoxInstance包含字段的map，而LoxClass包含方法的map。
     private final Map<String, Object> fields = new HashMap<>();
+    private SalmonClass klass;
 
     SalmonInstance(SalmonClass klass) {
         this.klass = klass;
