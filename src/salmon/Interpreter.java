@@ -55,6 +55,15 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitClassStmt(Stmt.Class stmt) {
+        Object superclass = null;
+        // 如果类中有超类表达式，我们就对其求值。因为我们可能会得到其它类型的对象，我们在运行时必须检查我们希望作为超类的对象是否确实是一个类。
+        if (stmt.superclass != null) {
+            superclass = evaluate(stmt.superclass);
+            if (!(superclass instanceof SalmonClass)) {
+                throw new RuntimeError(stmt.superclass.name, "Superclass must be a class.");
+            }
+        }
+
         environment.define(stmt.name.lexeme, null);
         // 我们在当前环境中声明该类的名称。然后我们把类的语法节点转换为LoxClass，即类的运行时表示。
         // 我们回过头来，将类对象存储在我们之前声明的变量中。这个二阶段的变量绑定过程允许在类的方法中引用其自身。
@@ -64,7 +73,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             methods.put(method.name.lexeme, function);
         }
 
-        SalmonClass klass = new SalmonClass(stmt.name.lexeme, methods);
+        SalmonClass klass = new SalmonClass(stmt.name.lexeme, (SalmonClass)superclass, methods);
 
         environment.assign(stmt.name, klass);
         return null;

@@ -5,10 +5,12 @@ import java.util.Map;
 
 public class SalmonClass implements SalmonCallable {
     final String name;
+    final SalmonClass superclass;
     // 实例存储状态，类存储行为。LoxInstance包含字段的map，而LoxClass包含方法的map。
     private final Map<String, SalmonFunction> methods;
 
-    SalmonClass(String name, Map<String, SalmonFunction> methods) {
+    SalmonClass(String name, SalmonClass superclass, Map<String, SalmonFunction> methods) {
+        this.superclass = superclass;
         this.name = name;
         this.methods = methods;
     }

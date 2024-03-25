@@ -42,6 +42,14 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         declare(stmt.name);
         define(stmt.name);
 
+        if (stmt.superclass != null && stmt.name.lexeme.equals(stmt.superclass.name.lexeme)) {
+            Salmon.error(stmt.superclass.name, "A class can't inherit from itself.");
+        }
+
+        if (stmt.superclass != null) {
+            resolve(stmt.superclass);
+        }
+
         // 在我们开始分析方法体之前，我们推入一个新的作用域，并在其中像定义变量一样定义“this”。然后，当我们完成后，会丢弃这个外围作用域。
         // 现在，只要遇到this表达式（至少是在方法内部），它就会解析为一个“局部变量”，该变量定义在方法体块之外的隐含作用域中。
         beginScope();
