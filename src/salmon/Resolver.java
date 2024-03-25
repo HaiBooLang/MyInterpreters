@@ -18,6 +18,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     // 我不知道用户认为会发生什么，但是我认为我们不希望Lox允许这种做法。
     // 就像我们遍历语法树时跟踪作用域一样，我们也可以跟踪当前访问的代码是否在一个函数声明内部。
     private FunctionType currentFunction = FunctionType.NONE;
+    private ClassType currentClass = ClassType.NONE;
 
 
     Resolver(Interpreter interpreter) {
@@ -35,12 +36,24 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitClassStmt(Stmt.Class stmt) {
+        ClassType enclosingClass = currentClass;
+        currentClass = ClassType.CLASS;
+
         declare(stmt.name);
         define(stmt.name);
+
+        // 在我们开始分析方法体之前，我们推入一个新的作用域，并在其中像定义变量一样定义“this”。然后，当我们完成后，会丢弃这个外围作用域。
+        // 现在，只要遇到this表达式（至少是在方法内部），它就会解析为一个“局部变量”，该变量定义在方法体块之外的隐含作用域中。
+        beginScope();
+        scopes.peek().put("this", true);
         for (Stmt.Function method : stmt.methods) {
             FunctionType declaration = FunctionType.METHOD;
             resolveFunction(method, declaration);
         }
+        endScope();
+
+        currentClass = enclosingClass;
+
         return null;
     }
 
@@ -189,6 +202,17 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
+    @Override
+    public Void visitThisExpr(Expr.This expr) {
+        if (currentClass == ClassType.NONE) {
+            Salmon.error(expr.keyword, "Can't use 'this' outside of a class.");
+            return null;
+        }
+
+        resolveLocal(expr, expr.keyword);
+        return null;
+    }
+
     // 接下来是最后一个节点，我们解析它的一个操作数。
     @Override
     public Void visitUnaryExpr(Expr.Unary expr) {
@@ -271,6 +295,11 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         NONE,
         FUNCTION,
         METHOD
+    }
+
+    private enum ClassType {
+        NONE,
+        CLASS
     }
 
 }

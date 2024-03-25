@@ -20,7 +20,7 @@ public class SalmonInstance {
         }
 
         SalmonFunction method = klass.findMethod(name.lexeme);
-        if (method != null) return method;
+        if (method != null) return method.bind(this);
 
         // 我们需要处理的一个有趣的边缘情况是，如果这个实例中不包含给定名称的属性，会发生什么。
         // 我们可以悄悄返回一些假值，如nil，但是根据我对JavaScript等语言的经验，这种行为只是掩盖了错误，而没有做任何有用的事。

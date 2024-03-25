@@ -415,17 +415,12 @@ public class Parser {
     // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
     // 该规则中大部分都是终止符，可以直接进行解析。
     private Expr primary() {
-        if (match(FALSE)) return new Expr.Literal(false);
+        if (match(NUMBER, STRING)) return new Expr.Literal(previous().literal);
         if (match(TRUE)) return new Expr.Literal(true);
+        if (match(FALSE)) return new Expr.Literal(false);
         if (match(NIL)) return new Expr.Literal(null);
-
-        if (match(NUMBER, STRING)) {
-            return new Expr.Literal(previous().literal);
-        }
-
-        if (match(IDENTIFIER)) {
-            return new Expr.Variable(previous());
-        }
+        if (match(THIS)) return new Expr.This(previous());
+        if (match(IDENTIFIER)) return new Expr.Variable(previous());
 
         // 当我们匹配了一个开头(并解析了里面的表达式后，我们必须找到一个)标记。如果没有找到，那就是一个错误。
         if (match(LEFT_PAREN)) {

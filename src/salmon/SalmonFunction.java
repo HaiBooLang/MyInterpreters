@@ -11,6 +11,13 @@ class SalmonFunction implements SalmonCallable {
         this.declaration = declaration;
     }
 
+    // 我们基于方法的原始闭包创建了一个新的环境。就像是闭包内的闭包。当方法被调用时，它将变成方法体对应环境的父环境。
+    SalmonFunction bind(SalmonInstance instance) {
+        Environment environment = new Environment(closure);
+        environment.define("this", instance);
+        return new SalmonFunction(declaration, environment);
+    }
+
     @Override
     public int arity() {
         return declaration.params.size();
