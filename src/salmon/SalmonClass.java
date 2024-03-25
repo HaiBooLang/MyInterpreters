@@ -30,12 +30,22 @@ public class SalmonClass implements SalmonCallable {
     @Override
     public Object call(Interpreter interpreter, List<Object> arguments) {
         SalmonInstance instance = new SalmonInstance(this);
+
+        SalmonFunction initializer = findMethod("init");
+        if (initializer != null) {
+            initializer.bind(instance).call(interpreter, arguments);
+        }
+
         return instance;
     }
 
     // arity() 方法是解释器用于验证你是否向callable中传入了正确数量的参数。
+    // 如果有初始化方法，该方法的元数就决定了在调用类本身的时候需要传入多少个参数。
+    // 但是，为了方便起见，我们并不要求类定义初始化方法。如果你没有初始化方法，元数仍然是0。
     @Override
     public int arity() {
-        return 0;
+        SalmonFunction initializer = findMethod("init");
+        if (initializer == null) return 0;
+        return initializer.arity();
     }
 }

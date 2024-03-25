@@ -48,6 +48,11 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         scopes.peek().put("this", true);
         for (Stmt.Function method : stmt.methods) {
             FunctionType declaration = FunctionType.METHOD;
+            // 我们通过被访问方法的名称来确定我们是否在分析一个初始化方法。
+            if (method.name.lexeme.equals("init")) {
+                // 当我们稍后遍历return语句时，我们会检查该字段，如果从init()方法内部返回一个值时就抛出一个错误。
+                declaration = FunctionType.INITIALIZER;
+            }
             resolveFunction(method, declaration);
         }
         endScope();
@@ -134,6 +139,9 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         }
 
         if (stmt.value != null) {
+            if (currentFunction == FunctionType.INITIALIZER) {
+                Salmon.error(stmt.keyword, "Can't return a value from an initializer.");
+            }
             resolve(stmt.value);
         }
 
@@ -294,6 +302,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     private enum FunctionType {
         NONE,
         FUNCTION,
+        INITIALIZER,
         METHOD
     }
 
