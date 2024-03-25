@@ -20,6 +20,11 @@ public class SalmonClass implements SalmonCallable {
             return methods.get(name);
         }
 
+        // 如果你能在超类的实例上调用某些方法，那么当给你一个子类的实例时，你也应该能调用这个方法。
+        if (superclass != null) {
+            return superclass.findMethod(name);
+        }
+
         return null;
     }
 
