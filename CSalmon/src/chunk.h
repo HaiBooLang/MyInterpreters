@@ -1,0 +1,38 @@
+#ifndef csalmon_chunk_h
+#define csalmon_chunk_h
+
+#include "common.h"
+#include "memory.h"
+
+// 在我们的字节码格式中，每个指令都有一个字节的操作码（通常简称为opcode）。这个数字控制我们要处理的指令类型——加、减、查找变量等。
+typedef enum {
+	OP_RETURN,
+} Opcode;
+
+// 字节码是一系列指令。最终，我们会与指令一起存储一些其它数据，所以让我们继续创建一个结构体来保存所有这些数据。
+// 由于我们在开始编译块之前不知道数组需要多大，所以它必须是动态的。动态数组是我最喜欢的数据结构之一。
+// 动态数组提供了：缓存友好，密集存储、索引元素查找为常量时间复杂度、数组末尾追加元素为常量时间复杂度。
+typedef struct {
+	int count;
+	int capacity;
+	uint8_t* code;
+} Chunk;
+
+void initChunk(Chunk* chunk);
+
+void writeChunk(Chunk* chunk, uint8_t byte);
+
+void freeChunk(Chunk* chunk);
+
+//class Chunk {
+//private:
+//	size_t _count;
+//	size_t _capacity;
+//	std::unique_ptr<uint8_t> _code;
+//
+//public:
+//	Chunk(size_t count,size_t capacity,uint8_t* code)
+//		:_count(count),_capacity(capacity),_code(std::move(code)) {}
+//};
+
+#endif
