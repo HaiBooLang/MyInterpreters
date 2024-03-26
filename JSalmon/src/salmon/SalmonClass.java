@@ -6,7 +6,7 @@ import java.util.Map;
 public class SalmonClass implements SalmonCallable {
     final String name;
     final SalmonClass superclass;
-    // 实例存储状态，类存储行为。LoxInstance包含字段的map，而LoxClass包含方法的map。
+    // 实例存储状态，类存储行为。SalmonInstance包含字段的map，而SalmonClass包含方法的map。
     private final Map<String, SalmonFunction> methods;
 
     SalmonClass(String name, SalmonClass superclass, Map<String, SalmonFunction> methods) {
@@ -33,7 +33,7 @@ public class SalmonClass implements SalmonCallable {
         return name;
     }
 
-    // 当你“调用”一个类时，它会为被调用的类实例化一个新的LoxInstance并返回。
+    // 当你“调用”一个类时，它会为被调用的类实例化一个新的SalmonInstance并返回。
     @Override
     public Object call(Interpreter interpreter, List<Object> arguments) {
         SalmonInstance instance = new SalmonInstance(this);

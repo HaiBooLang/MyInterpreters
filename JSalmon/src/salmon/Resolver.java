@@ -11,11 +11,11 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     // 解释器是使用链表（Environment对象组成的链）来实现栈的，在解析器中，我们使用一个真正的Java Stack。
     // 这个字段会记录当前作用域内的栈。栈中的每个元素是代表一个块作用域的Map。
     // 作用域map中与key相关联的值代表的是我们是否已经结束了对变量初始化式的解析。
-    // 作用域栈只用于局部块作用域。解析器不会跟踪在全局作用域的顶层声明的变量，因为它们在Lox中是更动态的。
+    // 作用域栈只用于局部块作用域。解析器不会跟踪在全局作用域的顶层声明的变量，因为它们在Salmon中是更动态的。
     // 当解析一个变量时，如果我们在本地作用域栈中找不到它，我们就认为它一定是全局的。
     private final Stack<Map<String, Boolean>> scopes = new Stack<>();
     // 这里执行了一个return语句，但它甚至根本不在函数内部。这是一个顶层代码。
-    // 我不知道用户认为会发生什么，但是我认为我们不希望Lox允许这种做法。
+    // 我不知道用户认为会发生什么，但是我认为我们不希望Salmon允许这种做法。
     // 就像我们遍历语法树时跟踪作用域一样，我们也可以跟踪当前访问的代码是否在一个函数声明内部。
     private FunctionType currentFunction = FunctionType.NONE;
     private ClassType currentClass = ClassType.NONE;

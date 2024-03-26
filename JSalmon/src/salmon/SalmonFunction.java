@@ -50,7 +50,7 @@ class SalmonFunction implements SalmonCallable {
             return returnValue.value;
         }
 
-        // 如果我们让init()方法总是返回this（即使是被直接调用时），它会使clox中的构造函数实现更加简单。
+        // 如果我们让init()方法总是返回this（即使是被直接调用时），它会使cSalmon中的构造函数实现更加简单。
         // 如果该函数是一个初始化方法，我们会覆盖实际的返回值并强行返回this。这个操作依赖于一个新的isInitializer字段。
         if (isInitializer) return closure.getAt(0, "this");
 

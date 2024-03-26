@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-// 这个类声明它是一个访问者。访问方法的返回类型将是Object，即我们在Java代码中用来引用Lox值的根类。
+// 这个类声明它是一个访问者。访问方法的返回类型将是Object，即我们在Java代码中用来引用Salmon值的根类。
 // 为了实现Visitor接口，我们需要为解析器生成的四个表达式树类中分别定义访问方法。
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     // 解释器中的environment字段会随着进入和退出局部作用域而改变，它会跟随当前环境。
@@ -18,7 +18,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     // 当我们实例化一个解释器时，我们将全局作用域中添加本地函数。
     Interpreter() {
-        // 这里有一个名为clock的变量，它的值是一个实现LoxCallable接口的Java匿名类。
+        // 这里有一个名为clock的变量，它的值是一个实现SalmonCallable接口的Java匿名类。
         // 这里的clock()函数不接受参数，所以其元数为0。
         // call()方法的实现是直接调用Java函数并将结果转换为以秒为单位的double值。
         globals.define("clock", new SalmonCallable() {
@@ -67,13 +67,13 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         environment.define(stmt.name.lexeme, null);
 
         // 当我们执行子类定义时，创建一个新环境。在这个环境中，我们保存指向超类的引用。
-        // 然后我们为每个方法创建LoxFunction。这些函数将捕获当前环境作为其闭包，像我们需要的那样维系着超类。
+        // 然后我们为每个方法创建SalmonFunction。这些函数将捕获当前环境作为其闭包，像我们需要的那样维系着超类。
         if (stmt.superclass != null) {
             environment = new Environment(environment);
             environment.define("super", superclass);
         }
 
-        // 我们在当前环境中声明该类的名称。然后我们把类的语法节点转换为LoxClass，即类的运行时表示。
+        // 我们在当前环境中声明该类的名称。然后我们把类的语法节点转换为SalmonClass，即类的运行时表示。
         // 我们回过头来，将类对象存储在我们之前声明的变量中。这个二阶段的变量绑定过程允许在类的方法中引用其自身。
         Map<String, SalmonFunction> methods = new HashMap<>();
         for (Stmt.Function method : stmt.methods) {
@@ -395,7 +395,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
     }
 
-    // 这是一段像isTruthy()一样的代码，它连接了Lox对象的用户视图和它们在Java中的内部表示。
+    // 这是一段像isTruthy()一样的代码，它连接了Salmon对象的用户视图和它们在Java中的内部表示。
     private String stringify(Object object) {
         if (object == null) return "nil";
 
@@ -411,7 +411,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
 
     // “真实”指的是什么呢？我们需要简单地讨论一下西方哲学中的一个伟大问题：什么是真理？
-    // Lox遵循Ruby的简单规则：false和nil是假的，其他都是真的。
+    // Salmon遵循Ruby的简单规则：false和nil是假的，其他都是真的。
     private boolean isTruthy(Object object) {
         if (object == null) return false;
         if (object instanceof Boolean) return (boolean) object;

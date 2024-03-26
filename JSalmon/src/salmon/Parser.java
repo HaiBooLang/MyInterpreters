@@ -16,7 +16,7 @@ public class Parser {
 
     // --------Rules for grammars--------
     // ----------Syntax Grammar----------
-    // 语法用于将词法标识（token）的线性序列解析为嵌套的语法树结构。它从匹配整个Lox程序（或单条REPL输入）的第一个规则开始。
+    // 语法用于将词法标识（token）的线性序列解析为嵌套的语法树结构。它从匹配整个Salmon程序（或单条REPL输入）的第一个规则开始。
     // program        → statement* EOF ;
     // -----------Declarations-----------
     // 一个程序就是一系列的声明，也就是绑定新标识符或其它statement类型的语句。
@@ -48,7 +48,7 @@ public class Parser {
     // whileStmt      → "while" "(" expression ")" statement ;
     // block          → "{" declaration* "}" ;
     // -----------Expressions------------
-    // 表达式会产生值。Lox有许多具有不同优先级的一元或二元运算符。
+    // 表达式会产生值。Salmon有许多具有不同优先级的一元或二元运算符。
     // 一些语言的语法中没有直接编码优先级关系，而是在其它地方指定。在这里，我们为每个优先级使用单独的规则，使其明确。
     // expression     → assignment ;
     // assignment     → ( call "." )? IDENTIFIER "=" assignment
@@ -104,7 +104,7 @@ public class Parser {
     // ----------Syntax Grammar----------
 
     // program        → statement* EOF ;
-    // program是语法的起点，代表一个完整的Lox脚本或REPL输入项。程序是一个语句列表，后面跟着特殊的“文件结束”(EOF)标记。
+    // program是语法的起点，代表一个完整的Salmon脚本或REPL输入项。程序是一个语句列表，后面跟着特殊的“文件结束”(EOF)标记。
     // 强制性的结束标记可以确保解析器能够消费所有输入内容，而不会默默地忽略脚本结尾处错误的、未消耗的标记。
     List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
@@ -172,7 +172,7 @@ public class Parser {
         List<Token> parameters = new ArrayList<>();
         if (!check(RIGHT_PAREN)) {
             do {
-                // Lox的Java解释器实际上并不需要限制，但是设置一个最大的参数数量限制可以简化第三部分中的字节码解释器。
+                // Salmon的Java解释器实际上并不需要限制，但是设置一个最大的参数数量限制可以简化第三部分中的字节码解释器。
                 if (parameters.size() >= 255) {
                     // 如果发现参数过多，这里的代码会报告一个错误，但是不会抛出该错误，并继续执行解析（解析器仍然处于完全有效的状态）。
                     error(peek(), "Can't have more than 255 parameters.");
@@ -504,7 +504,7 @@ public class Parser {
         List<Expr> arguments = new ArrayList<>();
         if (!check(RIGHT_PAREN)) {
             do {
-                // Lox的Java解释器实际上并不需要限制，但是设置一个最大的参数数量限制可以简化第三部分中的字节码解释器。
+                // Salmon的Java解释器实际上并不需要限制，但是设置一个最大的参数数量限制可以简化第三部分中的字节码解释器。
                 if (arguments.size() >= 255) {
                     // 如果发现参数过多，这里的代码会报告一个错误，但是不会抛出该错误，并继续执行解析（解析器仍然处于完全有效的状态）。
                     error(peek(), "Can't have more than 255 arguments.");

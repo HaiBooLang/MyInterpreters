@@ -8,7 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 
-// Lox是一种脚本语言，这意味着它直接从源代码执行。
+// Salmon是一种脚本语言，这意味着它直接从源代码执行。
 public class Salmon {
     // 我们把这个字段设置为静态的，这样在一个REPL会话中连续调用run()时就会重复使用同一个解释器。
     private static final Interpreter interpreter = new Interpreter();
@@ -19,10 +19,10 @@ public class Salmon {
 
     public static void main(String[] args) throws IOException {
         if (args.length > 1) {
-            System.out.println("Usage: jlox [script]");
+            System.out.println("Usage: jSalmon [script]");
             System.exit(64);
             // 我们的解释器支持两种运行代码的方式。
-            // 如果从命令行启动jlox并为其提供文件路径，它将读取该文件并执行。
+            // 如果从命令行启动jSalmon并为其提供文件路径，它将读取该文件并执行。
         } else if (args.length == 1) {
             runFile(args[0]);
             // 如果你想与你的解释器对话, 可以交互式的启动它。
