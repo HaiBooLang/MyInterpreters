@@ -129,6 +129,8 @@
   <ItemGroup>
     <ClCompile Include="src\chunk.cpp" />
     <ClCompile Include="src\chunk.h" />
+    <ClCompile Include="src\debug.cpp" />
+    <ClCompile Include="src\debug.h" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\memory.cpp" />
   </ItemGroup>

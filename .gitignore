@@ -30,3 +30,4 @@ bin/
 *.java~
 /CSalmon/.vs
 CSalmon/CSalmon.vcxproj.user
+/CSalmon/x64

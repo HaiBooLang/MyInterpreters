@@ -3,7 +3,15 @@
 // 我们提供编写模拟器来解决这个问题，这个模拟器是一个用软件编写的芯片，每次会解释字节码的一条指令。如果你愿意的话，可以叫它虚拟机（VM）。
 // 模拟层增加了开销，这是字节码比本地代码慢的一个关键原因。但作为回报，它为我们提供了可移植性。‘#include "common.h"
 #include "common.h"
+#include "chunk.h"
+#include "debug.h"
 
 int main(int argc, const char* argv[]) {
+	Chunk chunk;
+	initChunk(&chunk);
+	writeChunk(&chunk, OP_RETURN);
+	disassembleChunk(&chunk, "test chunk");
+	freeChunk(&chunk);
+
 	return 0;
 } 

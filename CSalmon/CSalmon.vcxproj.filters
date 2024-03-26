@@ -27,6 +27,12 @@
     <ClCompile Include="src\chunk.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\debug.h">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\debug.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\common.h">
