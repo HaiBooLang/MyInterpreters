@@ -11,7 +11,7 @@ typedef enum {
 	// 当VM执行常量指令时，它会“加载”常量以供使用。我们的字节码像大多数其它字节码一样，允许指令有操作数。
 	// 这些操作数以二进制数据的形式存储在指令流的操作码之后，让我们对指令的操作进行参数化。
 	// 每个操作码会定义它有多少操作数以及各自的含义。
-	OP_CONSTANT,	
+	OP_CONSTANT,
 } Opcode;
 
 // 字节码是一系列指令。最终，我们会与指令一起存储一些其它数据，所以让我们继续创建一个结构体来保存所有这些数据。
@@ -21,11 +21,12 @@ typedef struct {
 	int count;
 	int capacity;
 	uint8_t* code;
-	ValueArray constants; // 保存字节码块中的常量值。
+	int* lines;				// 该数组与字节码平级。数组中的每个数字都是字节码中对应字节所在的行号。。
+	ValueArray constants;	// 保存字节码块中的常量值。
 } Chunk;
 
 void initChunk(Chunk* chunk);
-void writeChunk(Chunk* chunk, uint8_t byte);
+void writeChunk(Chunk* chunk, uint8_t byte, int line);
 void freeChunk(Chunk* chunk);
 // 我们定义一个便捷的方法来向字节码块中添加一个新常量。
 int addConstant(Chunk* chunk, Value value);

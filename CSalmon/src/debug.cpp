@@ -30,6 +30,13 @@ int disassembleInstruction(Chunk* chunk, int offset) {
 	// 首先，它会打印给定指令的字节偏移量——这能告诉我们当前指令在字节码块中的位置。当我们在字节码中实现控制流和跳转时，这将是一个有用的路标。
 	printf("%04d ", offset);
 
+	if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
+		printf("   | ");
+	}
+	else {
+		printf("%4d ", chunk->lines[offset]);
+	}
+
 	// 接下来，它从字节码中的给定偏移量处读取一个字节。这也就是我们的操作码。
 	uint8_t instruction = chunk->code[offset];
 	// 我们根据该值做switch操作。
