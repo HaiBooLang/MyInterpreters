@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/MyInterpreters.iml" filepath="$PROJECT_DIR$/MyInterpreters.iml" />
+      <module fileurl="file://$PROJECT_DIR$/JSalmon.iml" filepath="$PROJECT_DIR$/JSalmon.iml" />
     </modules>
   </component>
 </project>
