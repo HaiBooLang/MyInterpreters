@@ -15,7 +15,11 @@ public class Parser {
     }
 
     // --------Rules for grammars--------
+    // ----------Syntax Grammar----------
+    // 语法用于将词法标识（token）的线性序列解析为嵌套的语法树结构。它从匹配整个Lox程序（或单条REPL输入）的第一个规则开始。
     // program        → statement* EOF ;
+    // -----------Declarations-----------
+    // 一个程序就是一系列的声明，也就是绑定新标识符或其它statement类型的语句。
     // declaration    → classDecl
     //                | funDecl
     //                | varDecl
@@ -23,16 +27,17 @@ public class Parser {
     // classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )?
     //                  "{" function* "}" ;
     // funDecl        → "fun" function ;
-    // function       → IDENTIFIER "(" parameters? ")" block ;
-    // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
     // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
-    // statement      → forStmt
+    // ------------Statements------------
+    // 其余的语句规则会产生副作用，但不会引入绑定。
+    // statement      → exprStmt
+    //                | forStmt
     //                | ifStmt
     //                | printStmt
     //                | returnStmt
     //                | whileStmt
-    //                | block
-    //                | exprStmt;
+    //                | block ;
+    // exprStmt       → expression ";" ;
     // forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
     //                  expression? ";"
     //                  expression? ")" statement ;
@@ -42,7 +47,9 @@ public class Parser {
     // returnStmt     → "return" expression? ";" ;
     // whileStmt      → "while" "(" expression ")" statement ;
     // block          → "{" declaration* "}" ;
-    // exprStmt       → expression ";" ;
+    // -----------Expressions------------
+    // 表达式会产生值。Lox有许多具有不同优先级的一元或二元运算符。
+    // 一些语言的语法中没有直接编码优先级关系，而是在其它地方指定。在这里，我们为每个优先级使用单独的规则，使其明确。
     // expression     → assignment ;
     // assignment     → ( call "." )? IDENTIFIER "=" assignment
     //                | logic_or ;
@@ -54,10 +61,21 @@ public class Parser {
     // factor         → unary ( ( "/" | "*" ) unary )* ;
     // unary          → ( "!" | "-" ) unary | call ;
     // call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
-    // arguments      → expression ( "," expression )* ;
     // primary        → "true" | "false" | "nil" | "this"
     //                | NUMBER | STRING | IDENTIFIER | "(" expression ")"
     //                | "super" "." IDENTIFIER ;
+    // ----------Utility rules-----------
+    // 为了使上面的规则更简洁一点，一些语法被拆分为几个重复使用的辅助规则。
+    // function       → IDENTIFIER "(" parameters? ")" block ;
+    // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
+    // arguments      → expression ( "," expression )* ;
+    // ---------Lexical Grammar----------
+    // 词法被扫描器用来将字符分组为词法标识（token）。语法是上下文无关的，词法是正则的——注意这里没有递归规则。
+    // NUMBER         → DIGIT+ ( "." DIGIT+ )? ;
+    // STRING         → "\"" <any char except "\"">* "\"" ;
+    // IDENTIFIER     → ALPHA ( ALPHA | DIGIT )* ;
+    // ALPHA          → "a" ... "z" | "A" ... "Z" | "_" ;
+    // DIGIT          → "0" ... "9" ;
     // ---------------EXPR---------------
     // "Grouping : Expr expression",
     // "Assign   : Token name, Expr value",
