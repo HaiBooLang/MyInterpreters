@@ -85,21 +85,23 @@ public class Parser {
     // "Call     : Expr callee, Token paren, List<Expr> arguments",
     // "Get      : Expr object, Token name",
     // "Set      : Expr object, Token name, Expr value",
+    // "This     : Token keyword",
     // "Literal  : Object value",
     // "Variable : Token name",
-    // "This     : Token keyword",
     // "Super    : Token keyword, Token method"
     // ---------------STMT---------------
     // "Class      : Token name, Expr.Variable superclass, List<Stmt.Function> methods",
     // "Function   : Token name, List<Token> params, List<Stmt> body",
     // "Var        : Token name, Expr initializer",
+    // "Expression : Expr expression"
     // "If         : Expr condition, Stmt thenBranch, Stmt elseBranch",
     // "Print      : Expr expression",
     // "Return     : Token keyword, Expr value",
     // "While      : Expr condition, Stmt body",
     // "Block      : List<Stmt> statements",
-    // "Expression : Expr expression"
     // ----------------------------------
+
+    // ----------Syntax Grammar----------
 
     // program        → statement* EOF ;
     // program是语法的起点，代表一个完整的Lox脚本或REPL输入项。程序是一个语句列表，后面跟着特殊的“文件结束”(EOF)标记。
@@ -111,6 +113,8 @@ public class Parser {
         }
         return statements;
     }
+
+    // -----------Declarations-----------
 
     // declaration    → classDecl
     //                | funDecl
@@ -197,13 +201,15 @@ public class Parser {
         return new Stmt.Var(name, initializer);
     }
 
-    // statement      → forStmt
+    // ------------Statements------------
+
+    // statement      → exprStmt
+    //                | forStmt
     //                | ifStmt
     //                | printStmt
     //                | returnStmt
     //                | whileStmt
-    //                | block
-    //                | exprStmt;
+    //                | block ;
     private Stmt statement() {
         if (match(FOR)) return forStatement();
         if (match(IF)) return ifStatement();
@@ -216,6 +222,14 @@ public class Parser {
         // 这是解析语句时典型的最终失败分支，因为我们很难通过第一个标记主动识别出一个表达式。
         return expressionStatement();
     }
+
+    // exprStmt       → expression ";" ;
+    private Stmt expressionStatement() {
+        Expr expr = expression();
+        consume(SEMICOLON, "Expect ';' after expression.");
+        return new Stmt.Expression(expr);
+    }
+
 
     // forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
     //                  expression? ";"
@@ -331,12 +345,7 @@ public class Parser {
         return statements;
     }
 
-    // exprStmt       → expression ";" ;
-    private Stmt expressionStatement() {
-        Expr expr = expression();
-        consume(SEMICOLON, "Expect ';' after expression.");
-        return new Stmt.Expression(expr);
-    }
+    // -----------Expressions------------
 
     // expression     → assignment ;
     private Expr expression() {
@@ -539,6 +548,8 @@ public class Parser {
         // 如果该方法中的case都不匹配，就意味着我们正面对一个不是表达式开头的语法标记。我们也需要处理这个错误。
         throw error(peek(), "Expect expression.");
     }
+
+    // ---------Auxiliary tools----------
 
     // 这个检查会判断当前的标记是否属于给定的类型之一。
     // 如果是，则消费该标记并返回true；否则，就返回false并保留当前标记。

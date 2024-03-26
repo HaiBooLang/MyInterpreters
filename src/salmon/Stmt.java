@@ -12,6 +12,8 @@ abstract class Stmt {
 
         R visitVarStmt(Var stmt);
 
+        R visitExpressionStmt(Expression stmt);
+
         R visitIfStmt(If stmt);
 
         R visitPrintStmt(Print stmt);
@@ -21,8 +23,6 @@ abstract class Stmt {
         R visitWhileStmt(While stmt);
 
         R visitBlockStmt(Block stmt);
-
-        R visitExpressionStmt(Expression stmt);
     }
 
     static class Class extends Stmt {
@@ -71,6 +71,19 @@ abstract class Stmt {
         @Override
         <R> R accept(Visitor<R> visitor) {
             return visitor.visitVarStmt(this);
+        }
+    }
+
+    static class Expression extends Stmt {
+        final Expr expression;
+
+        Expression(Expr expression) {
+            this.expression = expression;
+        }
+
+        @Override
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitExpressionStmt(this);
         }
     }
 
@@ -144,19 +157,6 @@ abstract class Stmt {
         @Override
         <R> R accept(Visitor<R> visitor) {
             return visitor.visitBlockStmt(this);
-        }
-    }
-
-    static class Expression extends Stmt {
-        final Expr expression;
-
-        Expression(Expr expression) {
-            this.expression = expression;
-        }
-
-        @Override
-        <R> R accept(Visitor<R> visitor) {
-            return visitor.visitExpressionStmt(this);
         }
     }
 }

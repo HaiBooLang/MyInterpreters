@@ -22,11 +22,11 @@ abstract class Expr {
 
         R visitSetExpr(Set expr);
 
+        R visitThisExpr(This expr);
+
         R visitLiteralExpr(Literal expr);
 
         R visitVariableExpr(Variable expr);
-
-        R visitThisExpr(This expr);
 
         R visitSuperExpr(Super expr);
     }
@@ -157,6 +157,19 @@ abstract class Expr {
         }
     }
 
+    static class This extends Expr {
+        final Token keyword;
+
+        This(Token keyword) {
+            this.keyword = keyword;
+        }
+
+        @Override
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitThisExpr(this);
+        }
+    }
+
     static class Literal extends Expr {
         final Object value;
 
@@ -180,19 +193,6 @@ abstract class Expr {
         @Override
         <R> R accept(Visitor<R> visitor) {
             return visitor.visitVariableExpr(this);
-        }
-    }
-
-    static class This extends Expr {
-        final Token keyword;
-
-        This(Token keyword) {
-            this.keyword = keyword;
-        }
-
-        @Override
-        <R> R accept(Visitor<R> visitor) {
-            return visitor.visitThisExpr(this);
         }
     }
 

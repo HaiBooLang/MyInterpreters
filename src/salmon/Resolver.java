@@ -29,13 +29,12 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     // "Class      : Token name, Expr.Variable superclass, List<Stmt.Function> methods",
     // "Function   : Token name, List<Token> params, List<Stmt> body",
     // "Var        : Token name, Expr initializer",
+    // "Expression : Expr expression"
     // "If         : Expr condition, Stmt thenBranch, Stmt elseBranch",
     // "Print      : Expr expression",
     // "Return     : Token keyword, Expr value",
     // "While      : Expr condition, Stmt body",
     // "Block      : List<Stmt> statements",
-    // "Expression : Expr expression"
-    // ----------------------------------
 
     @Override
     public Void visitClassStmt(Stmt.Class stmt) {
@@ -105,6 +104,13 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
+    // 一个表达式语句中包含一个需要遍历的表达式。
+    @Override
+    public Void visitExpressionStmt(Stmt.Expression stmt) {
+        resolve(stmt.expression);
+        return null;
+    }
+
     // if语句包含一个条件表达式，以及一个或两个分支语句。
     // 当我们解析if语句时，没有控制流。我们会解析条件表达式和两个分支表达式。
     // 动态执行则只会进入正在执行的分支，而静态分析是保守的——它会分析所有可能执行的分支。
@@ -158,13 +164,6 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
-    // 一个表达式语句中包含一个需要遍历的表达式。
-    @Override
-    public Void visitExpressionStmt(Stmt.Expression stmt) {
-        resolve(stmt.expression);
-        return null;
-    }
-
     // ---------------EXPR---------------
     // "Grouping : Expr expression",
     // "Assign   : Token name, Expr value",
@@ -174,9 +173,9 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     // "Call     : Expr callee, Token paren, List<Expr> arguments",
     // "Get      : Expr object, Token name",
     // "Set      : Expr object, Token name, Expr value",
+    // "This     : Token keyword",
     // "Literal  : Object value",
     // "Variable : Token name",
-    // "This     : Token keyword",
     // "Super    : Token keyword, Token method"
 
     @Override
@@ -241,6 +240,17 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
+    @Override
+    public Void visitThisExpr(Expr.This expr) {
+        if (currentClass == ClassType.NONE) {
+            Salmon.error(expr.keyword, "Can't use 'this' outside of a class.");
+            return null;
+        }
+
+        resolveLocal(expr, expr.keyword);
+        return null;
+    }
+
     // 字面表达式中没有使用任何变量，也不包含任何子表达式，所以也不需要做任何事情。
     @Override
     public Void visitLiteralExpr(Expr.Literal expr) {
@@ -256,17 +266,6 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         }
 
         resolveLocal(expr, expr.name);
-        return null;
-    }
-
-    @Override
-    public Void visitThisExpr(Expr.This expr) {
-        if (currentClass == ClassType.NONE) {
-            Salmon.error(expr.keyword, "Can't use 'this' outside of a class.");
-            return null;
-        }
-
-        resolveLocal(expr, expr.keyword);
         return null;
     }
 
