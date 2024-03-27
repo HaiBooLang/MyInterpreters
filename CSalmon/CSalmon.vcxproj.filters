@@ -19,22 +19,25 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="src\chunk.h">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="src\memory.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="src\chunk.cpp">
-      <Filter>源文件</Filter>
+      <Filter>头文件</Filter>
     </ClCompile>
     <ClCompile Include="src\debug.h">
-      <Filter>源文件</Filter>
+      <Filter>头文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\chunk.cpp">
+      <Filter>头文件</Filter>
     </ClCompile>
     <ClCompile Include="src\debug.cpp">
-      <Filter>源文件</Filter>
+      <Filter>头文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\memory.cpp">
+      <Filter>头文件</Filter>
     </ClCompile>
     <ClCompile Include="src\value.cpp">
-      <Filter>源文件</Filter>
+      <Filter>头文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\vm.cpp">
+      <Filter>头文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -45,6 +48,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\value.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\vm.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

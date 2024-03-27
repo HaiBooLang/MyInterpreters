@@ -3,24 +3,24 @@
 
 #include "common.h"
 
-// Õâ¸öºê»á¸ù¾Ý¸ø¶¨µÄµ±Ç°ÈÝÁ¿¼ÆËã³öÐÂµÄÈÝÁ¿¡£
-// ÎªÁË»ñµÃÎÒÃÇÏëÒªµÄÐÔÄÜ£¬ÖØÒªµÄ²¿·Ö¾ÍÊÇ»ùÓÚ¾ÉÈÝÁ¿´óÐ¡½øÐÐÀ©Õ¹¡£ÎÒÃÇÒÔ2µÄÏµÊýÔö³¤£¬ÕâÊÇÒ»¸öµäÐÍµÄÈ¡Öµ¡£1.5ÊÇÁíÍâÒ»¸ö³£¼ûµÄÑ¡Ôñ¡£
-// ÎÒÃÇ»¹»á´¦Àíµ±Ç°ÈÝÁ¿Îª0µÄÇé¿ö¡£ÔÚÕâÖÖÇé¿öÏÂ£¬ÎÒÃÇµÄÈÝÁ¿Ö±½ÓÌøµ½8£¬¶ø²»ÊÇ´Ó1¿ªÊ¼¡£
-// Õâ¾Í±ÜÃâÁËÔÚÊý×é·Ç³£Ð¡µÄÊ±ºò³öÏÖ¶îÍâµÄÄÚ´æ²¨¶¯£¬´ú¼ÛÊÇÔÚ·Ç³£Ð¡µÄ¿éÖÐÀË·Ñ¼¸¸ö×Ö½Ú¡£
+// è¿™ä¸ªå®ä¼šæ ¹æ®ç»™å®šçš„å½“å‰å®¹é‡è®¡ç®—å‡ºæ–°çš„å®¹é‡ã€‚
+// ä¸ºäº†èŽ·å¾—æˆ‘ä»¬æƒ³è¦çš„æ€§èƒ½ï¼Œé‡è¦çš„éƒ¨åˆ†å°±æ˜¯åŸºäºŽæ—§å®¹é‡å¤§å°è¿›è¡Œæ‰©å±•ã€‚æˆ‘ä»¬ä»¥2çš„ç³»æ•°å¢žé•¿ï¼Œè¿™æ˜¯ä¸€ä¸ªå…¸åž‹çš„å–å€¼ã€‚1.5æ˜¯å¦å¤–ä¸€ä¸ªå¸¸è§çš„é€‰æ‹©ã€‚
+// æˆ‘ä»¬è¿˜ä¼šå¤„ç†å½“å‰å®¹é‡ä¸º0çš„æƒ…å†µã€‚åœ¨è¿™ç§æƒ…å†µä¸‹ï¼Œæˆ‘ä»¬çš„å®¹é‡ç›´æŽ¥è·³åˆ°8ï¼Œè€Œä¸æ˜¯ä»Ž1å¼€å§‹ã€‚
+// è¿™å°±é¿å…äº†åœ¨æ•°ç»„éžå¸¸å°çš„æ—¶å€™å‡ºçŽ°é¢å¤–çš„å†…å­˜æ³¢åŠ¨ï¼Œä»£ä»·æ˜¯åœ¨éžå¸¸å°çš„å—ä¸­æµªè´¹å‡ ä¸ªå­—èŠ‚ã€‚
 #define GROW_CAPACITY(capacity) \
     ((capacity) < 8 ? 8 : (capacity) * 2)
 
-// Ò»µ©ÎÒÃÇÖªµÀÁËËùÐèµÄÈÝÁ¿£¬¾Í¿ÉÒÔÊ¹ÓÃGROW_ARRAY()´´½¨»òÀ©³äÊý×éµ½¸Ã´óÐ¡¡£
-// Õâ¸öºê¼ò»¯ÁË¶Ôreallocate()º¯ÊýµÄµ÷ÓÃ£¬ÕæÕýµÄ¹¤×÷¾ÍÊÇÔÚÆäÖÐÍê³ÉµÄ¡£
-// ºê±¾Éí¸ºÔð»ñÈ¡Êý×éÔªËØÀàÐÍµÄ´óÐ¡£¬²¢½«Éú³ÉµÄvoid*×ª»»³ÉÕýÈ·ÀàÐÍµÄÖ¸Õë¡£
+// ä¸€æ—¦æˆ‘ä»¬çŸ¥é“äº†æ‰€éœ€çš„å®¹é‡ï¼Œå°±å¯ä»¥ä½¿ç”¨GROW_ARRAY()åˆ›å»ºæˆ–æ‰©å……æ•°ç»„åˆ°è¯¥å¤§å°ã€‚
+// è¿™ä¸ªå®ç®€åŒ–äº†å¯¹reallocate()å‡½æ•°çš„è°ƒç”¨ï¼ŒçœŸæ­£çš„å·¥ä½œå°±æ˜¯åœ¨å…¶ä¸­å®Œæˆçš„ã€‚
+// å®æœ¬èº«è´Ÿè´£èŽ·å–æ•°ç»„å…ƒç´ ç±»åž‹çš„å¤§å°ï¼Œå¹¶å°†ç”Ÿæˆçš„void*è½¬æ¢æˆæ­£ç¡®ç±»åž‹çš„æŒ‡é’ˆã€‚
 #define GROW_ARRAY(type, pointer, oldCount, newCount) \
     (type*)reallocate(pointer, sizeof(type) * (oldCount), sizeof(type) * (newCount))
 
-// ÓëGROW_ARRAY()ÀàËÆ£¬ÕâÊÇ¶Ôreallocate()µ÷ÓÃµÄ°ü×°¡£Õâ¸öº¯ÊýÍ¨¹ý´«Èë0×÷ÎªÐÂµÄÄÚ´æ¿é´óÐ¡£¬À´ÊÍ·ÅÄÚ´æ¡£
+// ä¸ŽGROW_ARRAY()ç±»ä¼¼ï¼Œè¿™æ˜¯å¯¹reallocate()è°ƒç”¨çš„åŒ…è£…ã€‚è¿™ä¸ªå‡½æ•°é€šè¿‡ä¼ å…¥0ä½œä¸ºæ–°çš„å†…å­˜å—å¤§å°ï¼Œæ¥é‡Šæ”¾å†…å­˜ã€‚
 #define FREE_ARRAY(type, pointer, oldCount) \
     reallocate(pointer, sizeof(type) * (oldCount), 0)
 
-// Õâ¸öreallocate()º¯ÊýÊÇÎÒÃÇ½«ÔÚcloxÖÐÓÃÓÚËùÓÐ¶¯Ì¬ÄÚ´æ¹ÜÀíµÄÎ¨Ò»º¯Êý¡ª¡ª·ÖÅäÄÚ´æ£¬ÊÍ·ÅÄÚ´æÒÔ¼°¸Ä±äÏÖÓÐ·ÖÅäµÄ´óÐ¡¡£
+// è¿™ä¸ªreallocate()å‡½æ•°æ˜¯æˆ‘ä»¬å°†åœ¨cloxä¸­ç”¨äºŽæ‰€æœ‰åŠ¨æ€å†…å­˜ç®¡ç†çš„å”¯ä¸€å‡½æ•°â€”â€”åˆ†é…å†…å­˜ï¼Œé‡Šæ”¾å†…å­˜ä»¥åŠæ”¹å˜çŽ°æœ‰åˆ†é…çš„å¤§å°ã€‚
 void* reallocate(void* pointer, size_t oldSize, size_t newSize);
 
 #endif

@@ -3,9 +3,9 @@
 
 #include "chunk.h"
 
-// ÎÒÃÇµ÷ÓÃdisassembleChunk()À´·´»ã±àÕû¸ö×Ö½ÚÂë¿éÖĞµÄËùÓĞÖ¸Áî¡£
+// æˆ‘ä»¬è°ƒç”¨disassembleChunk()æ¥åæ±‡ç¼–æ•´ä¸ªå­—èŠ‚ç å—ä¸­çš„æ‰€æœ‰æŒ‡ä»¤ã€‚
 void disassembleChunk(Chunk* chunk, const char* name);
-// ÕâÊÇÓÃÁíÒ»¸öº¯ÊıÊµÏÖµÄ£¬¸Ãº¯ÊıÖ»·´»ã±àÒ»ÌõÖ¸Áî¡£
+// è¿™æ˜¯ç”¨å¦ä¸€ä¸ªå‡½æ•°å®ç°çš„ï¼Œè¯¥å‡½æ•°åªåæ±‡ç¼–ä¸€æ¡æŒ‡ä»¤ã€‚
 int disassembleInstruction(Chunk* chunk, int offset);
 
 #endif

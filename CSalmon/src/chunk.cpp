@@ -8,16 +8,16 @@ void initChunk(Chunk* chunk) {
 	chunk->capacity = 0;
 	chunk->code = NULL;
 	chunk->lines = NULL;
-	// ³õÊ¼»¯ĞÂµÄ×Ö½ÚÂë¿éÊ±£¬ÎÒÃÇÒ²Òª³õÊ¼»¯Æä³£Á¿ÖµÁĞ±í¡£
+	// åˆå§‹åŒ–æ–°çš„å­—èŠ‚ç å—æ—¶ï¼Œæˆ‘ä»¬ä¹Ÿè¦åˆå§‹åŒ–å…¶å¸¸é‡å€¼åˆ—è¡¨ã€‚
 	initValueArray(&chunk->constants);
 }
 
 void writeChunk(Chunk* chunk, uint8_t byte, int line) {
-	// ÎÒÃÇĞèÒª×öµÄµÚÒ»¼şÊÂÊÇ²é¿´µ±Ç°Êı×éÊÇ·ñÒÑ¾­ÓĞÈİÄÉĞÂ×Ö½ÚµÄÈİÁ¿¡£
-	// Èç¹ûÃ»ÓĞ£¬ÄÇÃ´ÎÒÃÇÊ×ÏÈĞèÒªÀ©³äÊı×éÒÔÌÚ³ö¿Õ¼ä£¨µ±ÎÒÃÇµÚÒ»¸öĞ´ÈëÊ±£¬Êı×éÎªNULL²¢ÇÒcapacityÎª0£¬Ò²»áÓöµ½ÕâÖÖÇé¿ö£©
+	// æˆ‘ä»¬éœ€è¦åšçš„ç¬¬ä¸€ä»¶äº‹æ˜¯æŸ¥çœ‹å½“å‰æ•°ç»„æ˜¯å¦å·²ç»æœ‰å®¹çº³æ–°å­—èŠ‚çš„å®¹é‡ã€‚
+	// å¦‚æœæ²¡æœ‰ï¼Œé‚£ä¹ˆæˆ‘ä»¬é¦–å…ˆéœ€è¦æ‰©å……æ•°ç»„ä»¥è…¾å‡ºç©ºé—´ï¼ˆå½“æˆ‘ä»¬ç¬¬ä¸€ä¸ªå†™å…¥æ—¶ï¼Œæ•°ç»„ä¸ºNULLå¹¶ä¸”capacityä¸º0ï¼Œä¹Ÿä¼šé‡åˆ°è¿™ç§æƒ…å†µï¼‰
 	if (chunk->capacity < chunk->count + 1) {
 		int oldCapacity = chunk->capacity;
-		// ÒªÀ©³äÊı×é£¬Ê×ÏÈÎÒÃÇÒªËã³öĞÂÈİÁ¿£¬È»ºó½«Êı×éÈİÁ¿À©³äµ½¸Ã´óĞ¡¡£
+		// è¦æ‰©å……æ•°ç»„ï¼Œé¦–å…ˆæˆ‘ä»¬è¦ç®—å‡ºæ–°å®¹é‡ï¼Œç„¶åå°†æ•°ç»„å®¹é‡æ‰©å……åˆ°è¯¥å¤§å°ã€‚
 		chunk->capacity = GROW_CAPACITY(oldCapacity);
 		chunk->code = GROW_ARRAY(uint8_t, chunk->code, oldCapacity, chunk->capacity);
 		chunk->lines = GROW_ARRAY(int, chunk->lines, oldCapacity, chunk->capacity);
@@ -29,16 +29,16 @@ void writeChunk(Chunk* chunk, uint8_t byte, int line) {
 }
 
 void freeChunk(Chunk* chunk) {
-	// ÎÒÃÇÊÍ·ÅËùÓĞµÄÄÚ´æ£¬È»ºóµ÷ÓÃinitChunk()½«×Ö¶ÎÇåÁã£¬Ê¹×Ö½ÚÂë¿é´¦ÓÚÒ»¸ö¶¨ÒåÃ÷È·µÄ¿Õ×´Ì¬¡£
+	// æˆ‘ä»¬é‡Šæ”¾æ‰€æœ‰çš„å†…å­˜ï¼Œç„¶åè°ƒç”¨initChunk()å°†å­—æ®µæ¸…é›¶ï¼Œä½¿å­—èŠ‚ç å—å¤„äºä¸€ä¸ªå®šä¹‰æ˜ç¡®çš„ç©ºçŠ¶æ€ã€‚
 	FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
 	FREE_ARRAY(int, chunk->lines, chunk->capacity);
-	// ÎÒÃÇÔÚÊÍ·Å×Ö½ÚÂë¿éÊ±£¬Ò²ĞèÒªÊÍ·Å³£Á¿Öµ¡£
+	// æˆ‘ä»¬åœ¨é‡Šæ”¾å­—èŠ‚ç å—æ—¶ï¼Œä¹Ÿéœ€è¦é‡Šæ”¾å¸¸é‡å€¼ã€‚
 	freeValueArray(&chunk->constants);
 	initChunk(chunk);
 }
 
 int addConstant(Chunk* chunk, Value value) {
 	writeValueArray(&chunk->constants, value);
-	// ÔÚÌí¼Ó³£Á¿Ö®ºó£¬ÎÒÃÇ·µ»Ø×·¼Ó³£Á¿µÄË÷Òı£¬ÒÔ±ãºóĞø¿ÉÒÔ¶¨Î»µ½ÏàÍ¬µÄ³£Á¿¡£
+	// åœ¨æ·»åŠ å¸¸é‡ä¹‹åï¼Œæˆ‘ä»¬è¿”å›è¿½åŠ å¸¸é‡çš„ç´¢å¼•ï¼Œä»¥ä¾¿åç»­å¯ä»¥å®šä½åˆ°ç›¸åŒçš„å¸¸é‡ã€‚
 	return chunk->constants.count - 1;
 }
