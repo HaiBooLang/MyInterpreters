@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "common.h"
+#include "compiler.h"
 #include "debug.h"
 #include "vm.h"
 
@@ -92,10 +93,11 @@ static InterpretResult run() {
 #undef BINARY_OP
 }
 
-InterpretResult interpret(Chunk* chunk) {
-	vm.chunk = chunk;
-	// 我们通过将ip指向块中的第一个字节码来对其初始化。
-	// 在虚拟机执行的整个过程中都是如此：IP总是指向下一条指令，而不是当前正在处理的指令。
-	vm.ip = vm.chunk->code;
-	return run();
+InterpretResult interpret(const char* source) {
+	compile(source);
+	return INTERPRET_OK;
+	//// 我们通过将ip指向块中的第一个字节码来对其初始化。
+	//// 在虚拟机执行的整个过程中都是如此：IP总是指向下一条指令，而不是当前正在处理的指令。
+	//vm.ip = vm.chunk->code;
+	//return run();
 }

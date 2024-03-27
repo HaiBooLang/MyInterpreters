@@ -133,6 +133,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\compiler.cpp" />
+    <ClCompile Include="src\scanner.cpp" />
     <ClCompile Include="src\chunk.cpp" />
     <ClCompile Include="src\chunk.h" />
     <ClCompile Include="src\debug.cpp" />
@@ -143,6 +145,8 @@
     <ClCompile Include="src\vm.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\compiler.h" />
+    <ClInclude Include="src\scanner.h" />
     <ClInclude Include="src\common.h" />
     <ClInclude Include="src\memory.h" />
     <ClInclude Include="src\value.h" />

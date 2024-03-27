@@ -31,7 +31,8 @@ typedef enum {
 // VM会逐步获取到一大堆它需要跟踪的状态，所以我们现在定义一个结构，把这些状态都塞进去。
 void initVM();
 void freeVM();
-InterpretResult interpret(Chunk* chunk);
+// 我们已经得到了Lox源代码字符串，所以现在我们准备建立一个管道来扫描、编译和执行它。管道是由interpret()驱动的。
+InterpretResult interpret(const char* source);
 
 void push(Value value);
 Value pop();
