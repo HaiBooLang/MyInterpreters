@@ -22,6 +22,15 @@ typedef struct {
 
 Parser parser;
 
+// 我们正在写入的字节码块被传递给compile()，但是它也需要进入emitByte()中。要做到这一点，我们依靠这个中间函数。
+// 现在，chunk指针存储在一个模块级变量中，就像我们存储其它全局状态一样。
+// 以后，当我们开始编译用户定义的函数时，“当前块”的概念会变得更加复杂。为了避免到时候需要回头修改大量代码，我把这个逻辑封装在currentChunk()函数中。
+Chunk* compilingChunk;
+
+static Chunk* currentChunk() {
+	return compilingChunk;
+}
+
 static void errorAt(Token* token, const char* message) {
 	// 当出现错误时，我们为其赋值。
 	// 之后，我们继续进行编译，就像错误从未发生过一样。字节码永远不会被执行，所以继续运行也是无害的。
@@ -88,9 +97,29 @@ static void consume(TokenType type, const char* message) {
 	errorAtCurrent(message);
 }
 
+// 在我们解析并理解了用户的一段程序之后，下一步是将其转换为一系列字节码指令。
+static void emitByte(uint8_t byte) {
+	writeChunk(currentChunk(), byte, parser.previous.line);
+}
+
+static void emitBytes(uint8_t byte1, uint8_t byte2) {
+	emitByte(byte1);
+	emitByte(byte2);
+}
+
+static void emitReturn() {
+	emitByte(OP_RETURN);
+}
+
+static void endCompiler() {
+	emitReturn();
+}
+
 // 我们将字节码块传入，而编译器会向其中写入代码，如何compile()返回编译是否成功。
 bool compile(const char* source, Chunk* chunk) {
 	initScanner(source);
+
+	compilingChunk = chunk;
 
 	parser.hadError = false;
 	parser.panicMode = false;
@@ -101,6 +130,8 @@ bool compile(const char* source, Chunk* chunk) {
 	expression();
 	// 在编译表达式之后，我们应该处于源代码的末尾，所以我们要检查EOF标识。
 	consume(TOKEN_EOF, "Expect end of expression.");
+
+	endCompiler();
 
 	// 如果发生错误，compile()应该返回false。
 	return !parser.hadError;
