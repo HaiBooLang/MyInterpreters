@@ -36,6 +36,15 @@ static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
 	// READ_CONTANT()从字节码中读取下一个字节，将得到的数字作为索引，并在代码块的常量表中查找相应的Value。
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+	// 围绕这个核心算术表达式的是一些模板代码，用于从栈中获取数值，并将结果结果压入栈中。
+	// 这个宏需要扩展为一系列语句。作为一个谨慎的宏作者，我们要确保当宏展开时，这些语句都在同一个作用域内。
+	// 在宏中使用do while循环看起来很滑稽，但它提供了一种方法，可以在一个代码块中包含多个语句，并且允许在末尾使用分号。
+#define BINARY_OP(op) \
+    do { \
+      double b = pop(); \
+      double a = pop(); \
+      push(a op b); \
+    } while (false)
 
 	// 我们有一个不断进行的外层循环。每次循环中，我们会读取并执行一条字节码指令。
 	for (;;) {
@@ -65,6 +74,11 @@ static InterpretResult run() {
 			push(constant);
 			break;
 		}
+		case OP_ADD:      BINARY_OP(+); break;	// 这四条指令之间唯一的区别是，它们最终使用哪一个底层C运算符来组合两个操作数。
+		case OP_SUBTRACT: BINARY_OP(-); break;
+		case OP_MULTIPLY: BINARY_OP(*); break;
+		case OP_DIVIDE:   BINARY_OP(/); break;
+		case OP_NEGATE:  push(-pop()); break;	// 该指令需要操作一个值，该值通过弹出栈获得。它对该值取负，然后把结果重新压入栈，以便后面的指令使用。
 		case OP_RETURN: {
 			printValue(pop());
 			printf("\n");
@@ -75,6 +89,7 @@ static InterpretResult run() {
 
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef BINARY_OP
 }
 
 InterpretResult interpret(Chunk* chunk) {
