@@ -4,22 +4,14 @@
 #include "compiler.h"
 #include "scanner.h"
 
-void compile(const char* source) {
+// 我们将字节码块传入，而编译器会向其中写入代码，如何compile()返回编译是否成功。
+bool compile(const char* source, Chunk* chunk) {
 	initScanner(source);
 
-    int line = -1;
-    // 这个循环是无限的。每循环一次，它就会扫描一个词法标识并打印出来。当它遇到特殊的“文件结束”标识或错误时，就会停止。
-    for (;;) {
-        Token token = scanToken();
-        if (token.line != line) {
-            printf("%4d ", token.line);
-            line = token.line;
-        }
-        else {
-            printf("   | ");
-        }
-        printf("%2d '%.*s'\n", token.type, token.length, token.start);
-
-        if (token.type == TOKEN_EOF) break;
-    }
+	// 对advance()的调用会在扫描器上“启动泵”。
+	advance();
+	// 然后我们解析一个表达式。我们还不打算处理语句，所以表达式是我们支持的唯一的语法子集。
+	expression();
+	// 在编译表达式之后，我们应该处于源代码的末尾，所以我们要检查EOF标识。
+	consume(TOKEN_EOF, "Expect end of expression.");
 }

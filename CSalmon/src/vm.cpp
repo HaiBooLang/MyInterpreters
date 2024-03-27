@@ -94,10 +94,24 @@ static InterpretResult run() {
 }
 
 InterpretResult interpret(const char* source) {
-	compile(source);
-	return INTERPRET_OK;
-	//// 我们通过将ip指向块中的第一个字节码来对其初始化。
-	//// 在虚拟机执行的整个过程中都是如此：IP总是指向下一条指令，而不是当前正在处理的指令。
-	//vm.ip = vm.chunk->code;
-	//return run();
+	// 我们创建一个新的空字节码块，并将其传递给编译器。
+	Chunk chunk;
+	initChunk(&chunk);
+
+	// 编译器会获取用户的程序，并将字节码填充到该块中。
+	if (!compile(source, &chunk)) {
+		// 如果遇到错误，compile()方法会返回false，我们就会丢弃不可用的字节码块。
+		freeChunk(&chunk);
+		return INTERPRET_COMPILE_ERROR;
+	}
+
+	// 否则，我们将完整的字节码块发送到虚拟机中去执行。
+	vm.chunk = &chunk;
+	vm.ip = vm.chunk->code;
+
+	InterpretResult result = run();
+
+	// 当虚拟机完成后，我们会释放该字节码块，这样就完成了。
+	freeChunk(&chunk);
+	return result;
 }
