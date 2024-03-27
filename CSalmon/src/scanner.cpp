@@ -140,6 +140,74 @@ static Token number() {
 	return makeToken(TOKEN_NUMBER);
 }
 
+static bool isAlpha(char c) {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
+// 我们将此用于树中的所有无分支路径。一旦我们发现一个前缀，其只有可能是一种保留字，我们需要验证两件事。词素必须与关键字一样长。
+// 如果我们字符数量确实正确，并且它们是我们想要的字符，那这就是一个关键字，我们返回相关的标识类型。否则，它必然是一个普通的标识符。
+static TokenType checkKeyword(int start, int length,
+	const char* rest, TokenType type) {
+	if (scanner.current - scanner.start == start + length && memcmp(scanner.start + start, rest, length) == 0) {
+		return type;
+	}
+
+	return TOKEN_IDENTIFIER;
+}
+
+static TokenType identifierType() {
+	// 字典树会存储一组字符串。大多数其它用于存储字符串的数据结构都包含原始字符数组，然后将它们封装在一些更大的结果中，以帮助你更快地搜索。
+	// 字典树则不同，在其中你找不到一个完整的字符串。相应地，字典树中“包含”的每个字符串被表示为通过字符树中节点的路径。
+	// 字典树是一种更基本的数据结构的特殊情况：确定性有限状态机（deterministic finite automaton ，DFA）。
+	// 你可能还知道它的其它名字：有限状态机，或就叫状态机。状态机是非常重要的，从游戏编程到实现网络协议的一切方面都很有用。
+	// 在DFA中，你有一组状态，它们之间有转换，形成一个图。在任何时间点，机器都“处于”其中一个状态。它通过转换过渡到其它状态。
+	// 当你使用DFA进行词法分析时，每个转换都是从字符串中匹配到的一个字符。每个状态代表一组允许的字符。
+	// 我们的关键字树正是一个能够识别Lox关键字的DFA。但是DFA比简单的树更强大，因为它们可以是任意的图。转换可以在状态之间形成循环。这让你可以识别任意长的字符串。
+	// 然而，手工完成这种巨型DFA是一个巨大的挑战。这就是Lex诞生的原因。
+	// 你给它一个关于语法的简单文本描述——一堆正则表达式——它就会自动为你生成一个DFA，并生成一堆实现它的C代码。
+	// 我们就不走这条路了。我们已经有了一个完全可用的简单扫描器。我们只需要一个很小的字典树来识别关键字。
+	// 我们不会为每个节点都增加一个switch语句。相反，我们有一个工具函数来测试潜在关键字词素的剩余部分。
+	switch (scanner.start[0]) {
+	case 'a': return checkKeyword(1, 2, "nd", TOKEN_AND);			// 这些是对应于单个关键字的首字母。
+	case 'c': return checkKeyword(1, 4, "lass", TOKEN_CLASS);
+	case 'e': return checkKeyword(1, 3, "lse", TOKEN_ELSE);
+	case 'f':														// 我们有几个关键字是在第一个字母之后又有树的分支。
+		// 在我们进入switch语句之前，需要先检查是否有第二个字母。毕竟，“f”本身也是一个有效的标识符。
+		if (scanner.current - scanner.start > 1) {
+			switch (scanner.start[1]) {
+			case 'a': return checkKeyword(2, 3, "lse", TOKEN_FALSE);
+			case 'o': return checkKeyword(2, 1, "r", TOKEN_FOR);
+			case 'u': return checkKeyword(2, 1, "n", TOKEN_FUN);
+			}
+		}
+		break;
+	case 'i': return checkKeyword(1, 1, "f", TOKEN_IF);
+	case 'n': return checkKeyword(1, 2, "il", TOKEN_NIL);
+	case 'o': return checkKeyword(1, 1, "r", TOKEN_OR);
+	case 'p': return checkKeyword(1, 4, "rint", TOKEN_PRINT);
+	case 'r': return checkKeyword(1, 5, "eturn", TOKEN_RETURN);
+	case 's': return checkKeyword(1, 4, "uper", TOKEN_SUPER);
+	case 't':
+		if (scanner.current - scanner.start > 1) {
+			switch (scanner.start[1]) {
+			case 'h': return checkKeyword(2, 2, "is", TOKEN_THIS);
+			case 'r': return checkKeyword(2, 2, "ue", TOKEN_TRUE);
+			}
+		}
+		break;
+	case 'v': return checkKeyword(1, 2, "ar", TOKEN_VAR);
+	case 'w': return checkKeyword(1, 4, "hile", TOKEN_WHILE);
+	}
+	return TOKEN_IDENTIFIER;
+}
+
+// 一旦我们发现一个标识符，我们就通过下面的方法扫描其余部分。
+// 在第一个字母之后，我们也允许使用数字，并且我们会一直消费字母数字，直到消费完为止。然后我们生成一个具有适当类型的词法标识。
+static Token identifier() {
+	while (isAlpha(peek()) || isDigit(peek())) advance();
+	return makeToken(identifierType());
+}
+
 Token scanToken() {
 	// 我们的扫描器需要处理空格、制表符和换行符，但是这些字符不会成为任何标识词素的一部分。
 	// 我们可以在scanToken()中的主要的字符switch语句中检查这些字符，但要想确保当你调用该函数时，它仍然能正确地找到空白字符后的下一个标识，这就有点棘手了。
@@ -155,6 +223,7 @@ Token scanToken() {
 	// 如果我们没有达到结尾，我们会做一些……事情……来扫描下一个标识。
 	char c = advance();
 
+	if (isAlpha(c)) return identifier();
 	if (isDigit(c)) return number();
 
 	switch (c) {
