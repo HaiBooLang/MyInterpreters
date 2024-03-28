@@ -20,6 +20,22 @@ typedef struct {
 	bool panicMode;
 } Parser;
 
+// 为了把“优先级”作为一个参数，我们用数值来定义它。
+// 这些是Salmon中的所有优先级，按照从低到高的顺序排列。由于C语言会隐式地为枚举赋值连续递增的数字，这就意味着PREC_CALL在数值上比PREC_UNARY要大。
+typedef enum {
+	PREC_NONE,
+	PREC_ASSIGNMENT,  // =
+	PREC_OR,          // or
+	PREC_AND,         // and
+	PREC_EQUALITY,    // == !=
+	PREC_COMPARISON,  // < > <= >=
+	PREC_TERM,        // + -
+	PREC_FACTOR,      // * /
+	PREC_UNARY,       // ! -
+	PREC_CALL,        // . ()
+	PREC_PRIMARY
+} Precedence;
+
 Parser parser;
 
 // 我们正在写入的字节码块被传递给compile()，但是它也需要进入emitByte()中。要做到这一点，我们依靠这个中间函数。
@@ -111,8 +127,66 @@ static void emitReturn() {
 	emitByte(OP_RETURN);
 }
 
+static uint8_t makeConstant(Value value) {
+	// 它将给定的值添加到字节码块的常量表的末尾，并返回其索引。这个新函数的工作主要是确保我们没有太多常量。
+	// 由于OP_CONSTANT指令使用单个字节来索引操作数，所以我们在一个块中最多只能存储和加载256个常量。
+	int constant = addConstant(currentChunk(), value);
+	if (constant > UINT8_MAX) {
+		error("Too many constants in one chunk.");
+		return 0;
+	}
+
+	return (uint8_t)constant;
+}
+
+static void emitConstant(Value value) {
+	// 首先，我们将值添加到常量表中，然后我们发出一条OP_CONSTANT指令，在运行时将其压入栈中。
+	emitBytes(OP_CONSTANT, makeConstant(value));
+}
+
 static void endCompiler() {
 	emitReturn();
+}
+
+static void grouping() {
+	// 我们假定初始的(已经被消耗了。我们递归地调用expression()来编译括号之间的表达式，然后解析结尾的)。
+	// 就后端而言，分组表达式实际上没有任何意义。它的唯一功能是语法上的——它允许你在需要高优先级的地方插入一个低优先级的表达式。
+	// 因此，它本身没有运行时语法，也就不会发出任何字节码。对expression()的内部调用负责为括号内的表达式生成字节码。
+	expression();
+	consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
+}
+
+static void expression() {
+	// 我们只需要解析最低优先级，它也包含了所有更高优先级的表达式。
+	parsePrecedence(PREC_ASSIGNMENT);
+}
+
+// 为了编译数值字面量，我们在数组的TOKEN_NUMBER索引处存储一个指向下面函数的指针。
+static void number() {
+	// 我们假定数值字面量标识已经被消耗了，并被存储在previous中。我们获取该词素，并使用C标准库将其转换为一个double值。
+	double value = strtod(parser.previous.start, NULL);
+	// 然后我们用下面的函数生成加载该double值的字节码。
+	emitConstant(value);
+}
+
+static void unary() {
+	// 前导的-标识已经被消耗掉了，并被放在parser.previous中。我们从中获取标识类型，以了解当前正在处理的是哪个一元运算符。
+	TokenType operatorType = parser.previous.type;
+
+	// 我们使用一元运算符本身的PREC_UNARY优先级来允许嵌套的一元表达式。
+	// 因为一元运算符的优先级很高，所以正确地排除了二元运算符之类的东西。
+	parsePrecedence(PREC_UNARY);
+
+	// 之后，我们发出字节码执行取负运算。
+	switch (operatorType) {
+	case TOKEN_MINUS: emitByte(OP_NEGATE); break;
+	default: return; // Unreachable.
+	}
+}
+
+// 这个函数（一旦实现）从当前的标识开始，解析给定优先级或更高优先级的任何表达式。
+static void parsePrecedence(Precedence precedence) {
+	// What goes here?
 }
 
 // 我们将字节码块传入，而编译器会向其中写入代码，如何compile()返回编译是否成功。
