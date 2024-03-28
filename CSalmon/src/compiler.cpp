@@ -36,6 +36,63 @@ typedef enum {
 	PREC_PRIMARY
 } Precedence;
 
+// 这个ParseFn类型是一个简单的函数类型定义，这类函数不需要任何参数且不返回任何内容。
+typedef void (*ParseFn)();
+
+// 我们还知道，我们需要一个表格，给定一个标识类型，可以从中找到：
+// 编译以该类型标识为起点的前缀表达式的函数，编译一个左操作数后跟该类型标识的中缀表达式的函数，以及使用该标识作为操作符的中缀表达式的优先级。
+typedef struct {
+	ParseFn prefix;
+	ParseFn infix;
+	Precedence precedence;
+} ParseRule;
+
+// 你可以看到grouping和unary是如何被插入到它们各自标识类型对应的前缀解析器列中的。
+// 在下一列中，binary被连接到四个算术中缀操作符上。这些中缀操作符的优先级也设置在最后一列。
+// 除此之外，表格的其余部分都是NULL和PREC_NONE。这些空的单元格中大部分是因为没有与这些标识相关联的表达式。
+ParseRule rules[] = {
+  [TOKEN_LEFT_PAREN] = {grouping, NULL,   PREC_NONE},
+  [TOKEN_RIGHT_PAREN] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_LEFT_BRACE] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_RIGHT_BRACE] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_COMMA] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_DOT] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_MINUS] = {unary,    binary, PREC_TERM},
+  [TOKEN_PLUS] = {NULL,     binary, PREC_TERM},
+  [TOKEN_SEMICOLON] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_SLASH] = {NULL,     binary, PREC_FACTOR},
+  [TOKEN_STAR] = {NULL,     binary, PREC_FACTOR},
+  [TOKEN_BANG] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_BANG_EQUAL] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_EQUAL] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_EQUAL_EQUAL] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_GREATER] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_GREATER_EQUAL] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_LESS] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_LESS_EQUAL] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_IDENTIFIER] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_STRING] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_NUMBER] = {number,   NULL,   PREC_NONE},
+  [TOKEN_AND] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_CLASS] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_ELSE] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_FALSE] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_FOR] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_FUN] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_IF] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_NIL] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_OR] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_PRINT] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_RETURN] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_SUPER] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_THIS] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_TRUE] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_VAR] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_WHILE] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_ERROR] = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_EOF] = {NULL,     NULL,   PREC_NONE},
+};
+
 Parser parser;
 
 // 我们正在写入的字节码块被传递给compile()，但是它也需要进入emitByte()中。要做到这一点，我们依靠这个中间函数。
@@ -148,6 +205,10 @@ static void endCompiler() {
 	emitReturn();
 }
 
+static void expression();
+static ParseRule* getRule(TokenType type);
+static void parsePrecedence(Precedence precedence);
+
 static void binary() {
 	// 当前缀解析函数被调用时，前缀标识已经被消耗了。中缀解析函数被调用时，情况更进一步——整个左操作数已经被编译，而随后的中缀操作符也已经被消耗掉。
 	// 首先左操作数已经被编译的事实是很好的。这意味着在运行时，其代码已经被执行了。当它运行时，它产生的值最终进入栈中。而这正是中缀操作符需要它的地方。
@@ -208,7 +269,26 @@ static void unary() {
 
 // 这个函数（一旦实现）从当前的标识开始，解析给定优先级或更高优先级的任何表达式。
 static void parsePrecedence(Precedence precedence) {
-	// What goes here?
+	// 我们读取下一个标识并查找对应的ParseRule。如果没有前缀解析器，那么这个标识一定是语法错误。我们会报告这个错误并返回给调用方。
+	advance();
+	ParseFn prefixRule = getRule(parser.previous.type)->prefix;
+	if (prefixRule == NULL) {
+		error("Expect expression.");
+		return;
+	}
+
+	// 否则，我们就调用前缀解析函数，让它做自己的事情。该前缀解析器会编译表达式的其余部分，消耗它需要的任何其它标识，然后返回这里。
+	prefixRule();
+	while (precedence <= getRule(parser.current.type)->precedence) {
+		advance();
+		ParseFn infixRule = getRule(parser.previous.type)->infix;
+		infixRule();
+	}
+}
+
+// 它只是简单地返回指定索引处的规则。
+static ParseRule* getRule(TokenType type) {
+	return &rules[type];
 }
 
 // 我们将字节码块传入，而编译器会向其中写入代码，如何compile()返回编译是否成功。
