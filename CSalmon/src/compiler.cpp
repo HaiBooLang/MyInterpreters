@@ -148,6 +148,28 @@ static void endCompiler() {
 	emitReturn();
 }
 
+static void binary() {
+	// 当前缀解析函数被调用时，前缀标识已经被消耗了。中缀解析函数被调用时，情况更进一步——整个左操作数已经被编译，而随后的中缀操作符也已经被消耗掉。
+	// 首先左操作数已经被编译的事实是很好的。这意味着在运行时，其代码已经被执行了。当它运行时，它产生的值最终进入栈中。而这正是中缀操作符需要它的地方。
+	// 每个二元运算符的右操作数的优先级都比自己高一级。
+	// 我们可以通过getRule()动态地查找，我们很快就会讲到。有了它，我们就可以使用比当前运算符高一级的优先级来调用parsePrecedence()。
+	TokenType operatorType = parser.previous.type;
+	ParseRule* rule = getRule(operatorType);
+	parsePrecedence((Precedence)(rule->precedence + 1));
+
+	// 然后我们使用binary()来处理算术操作符的其余部分。
+	// 这个函数会编译右边的操作数，就像unary()编译自己的尾操作数那样。最后，它会发出执行对应二元运算的字节码指令。
+	// 当运行时，虚拟机会按顺序执行左、右操作数的代码，将它们的值留在栈上。然后它会执行操作符的指令。
+	// 这时，会从栈中弹出这两个值，计算结果，并将结果推入栈中。
+	switch (operatorType) {
+	case TOKEN_PLUS:          emitByte(OP_ADD); break;
+	case TOKEN_MINUS:         emitByte(OP_SUBTRACT); break;
+	case TOKEN_STAR:          emitByte(OP_MULTIPLY); break;
+	case TOKEN_SLASH:         emitByte(OP_DIVIDE); break;
+	default: return; // Unreachable.
+	}
+}
+
 static void grouping() {
 	// 我们假定初始的(已经被消耗了。我们递归地调用expression()来编译括号之间的表达式，然后解析结尾的)。
 	// 就后端而言，分组表达式实际上没有任何意义。它的唯一功能是语法上的——它允许你在需要高优先级的地方插入一个低优先级的表达式。

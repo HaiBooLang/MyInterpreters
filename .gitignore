@@ -31,3 +31,4 @@ bin/
 /CSalmon/.vs
 CSalmon/CSalmon.vcxproj.user
 /CSalmon/x64
+*.TMP
