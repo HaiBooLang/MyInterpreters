@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdio.h>
 #include "common.h"
 #include "compiler.h"
@@ -11,6 +12,27 @@ static void resetStack() {
 	// 因为栈数组是直接在VM结构体中内联声明的，所以我们不需要为其分配空间。我们甚至不需要清除数组中不使用的单元——我们只有在值存入之后才会访问它们。
 	// 我们需要的唯一的初始化操作就是将stackTop指向数组的起始位置，以表明栈是空的。
 	vm.stackTop = vm.stack;
+}
+
+// 这本书不是C语言教程，所以我在这里略过了，但是基本上是...和va_list让我们可以向runtimeError()传递任意数量的参数。
+// 它将这些参数转发给vfprintf()，这是printf()的一个变体，需要一个显式地va_list。
+// 调用者可以向runtimeError()传入一个格式化字符串，后跟一些参数，就像他们直接调用printf()一样。然后runtimeError()格式化并打印这些参数。
+static void runtimeError(const char* format, ...) {
+	va_list args;
+	va_start(args, format);
+	vfprintf(stderr, format, args);
+	va_end(args);
+	fputs("\n", stderr);
+
+	// 在显示了希望有帮助的错误信息之后，我们还会告诉用户，当错误发生时正在执行代码中的哪一行。
+	// 因为我们在编译器中留下了标识，所以我们可以从编译到字节码块中的调试信息中查找行号。
+	// 如果我们的编译器正确完成了它的工作，就能对应到字节码被编译出来的那一行源代码。
+	// 我们使用当前字节码指令索引减1来查看字节码块的调试行数组。这是因为解释器在之前每条指令之前都会向前推进。
+	// 所以，当我们调用 runtimeError()，失败的指令就是前一条。
+	size_t instruction = vm.ip - vm.chunk->code - 1;
+	int line = vm.chunk->lines[instruction];
+	fprintf(stderr, "[line %d] in script\n", line);
+	resetStack();
 }
 
 void initVM() {
@@ -31,6 +53,11 @@ Value pop() {
 	return *vm.stackTop;
 }
 
+// 它从堆栈中返回一个Value，但是并不弹出它。distance参数是指要从堆栈顶部向下看多远：0是栈顶，1是下一个槽，以此类推。
+static Value peek(int distance) {
+	return vm.stackTop[-1 - distance];
+}
+
 static InterpretResult run() {
 	// 为了使作用域更明确，宏定义本身要被限制在该函数中。我们在开始时定义了它们，然后因为我们比较关心，在结束时取消它们的定义。
 	// READ_BYTE这个宏会读取ip当前指向字节，然后推进指令指针。
@@ -40,11 +67,15 @@ static InterpretResult run() {
 	// 围绕这个核心算术表达式的是一些模板代码，用于从栈中获取数值，并将结果结果压入栈中。
 	// 这个宏需要扩展为一系列语句。作为一个谨慎的宏作者，我们要确保当宏展开时，这些语句都在同一个作用域内。
 	// 在宏中使用do while循环看起来很滑稽，但它提供了一种方法，可以在一个代码块中包含多个语句，并且允许在末尾使用分号。
-#define BINARY_OP(op) \
+#define BINARY_OP(valueType, op) \
     do { \
-      double b = pop(); \
-      double a = pop(); \
-      push(a op b); \
+      if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
+        runtimeError("Operands must be numbers."); \
+        return INTERPRET_RUNTIME_ERROR; \
+      } \
+      double b = AS_NUMBER(pop()); \
+      double a = AS_NUMBER(pop()); \
+      push(valueType(a op b)); \
     } while (false)
 
 	// 我们有一个不断进行的外层循环。每次循环中，我们会读取并执行一条字节码指令。
@@ -75,11 +106,19 @@ static InterpretResult run() {
 			push(constant);
 			break;
 		}
-		case OP_ADD:      BINARY_OP(+); break;	// 这四条指令之间唯一的区别是，它们最终使用哪一个底层C运算符来组合两个操作数。
-		case OP_SUBTRACT: BINARY_OP(-); break;
-		case OP_MULTIPLY: BINARY_OP(*); break;
-		case OP_DIVIDE:   BINARY_OP(/); break;
-		case OP_NEGATE:  push(-pop()); break;	// 该指令需要操作一个值，该值通过弹出栈获得。它对该值取负，然后把结果重新压入栈，以便后面的指令使用。
+		case OP_ADD:      BINARY_OP(NUMBER_VAL, +); break;	// 这四条指令之间唯一的区别是，它们最终使用哪一个底层C运算符来组合两个操作数。
+		case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -); break;
+		case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
+		case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, /); break;
+		case OP_NEGATE:	// 该指令需要操作一个值，该值通过弹出栈获得。它对该值取负，然后把结果重新压入栈，以便后面的指令使用。
+			// 首先，我们检查栈顶的Value是否是一个数字。如果不是，则报告运行时错误并停止解释器。
+			if (!IS_NUMBER(peek(0))) {
+				runtimeError("Operand must be a number.");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			// 否则，我们就继续运行。只有在验证之后，我们才会拆装操作数，取负，将结果封装并压入栈。
+			push(NUMBER_VAL(-AS_NUMBER(pop())));
+			break;
 		case OP_RETURN: {
 			printValue(pop());
 			printf("\n");

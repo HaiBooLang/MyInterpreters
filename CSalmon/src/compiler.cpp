@@ -277,7 +277,7 @@ static void number() {
 	// 我们假定数值字面量标识已经被消耗了，并被存储在previous中。我们获取该词素，并使用C标准库将其转换为一个double值。
 	double value = strtod(parser.previous.start, NULL);
 	// 然后我们用下面的函数生成加载该double值的字节码。
-	emitConstant(value);
+	emitConstant(emitConstant(NUMBER_VAL(value)););
 }
 
 static void unary() {
