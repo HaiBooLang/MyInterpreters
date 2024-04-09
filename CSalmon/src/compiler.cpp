@@ -5,6 +5,9 @@
 #include "common.h"
 #include "compiler.h"
 #include "scanner.h"
+#ifdef DEBUG_PRINT_CODE
+#include "debug.h"
+#endif
 
 // 像我们要构建的单遍编译器并不是对所有语言都有效。
 // 因为编译器在生产代码时只能“管窥”用户的程序，所以语言必须设计成不需要太多外围的上下文环境就能理解一段语法。
@@ -222,6 +225,12 @@ static void emitConstant(Value value) {
 
 static void endCompiler() {
 	emitReturn();
+#ifdef DEBUG_PRINT_CODE
+	// 只有在代码没有错误的情况下，我们才会这样做。
+	if (!parser.hadError) {
+		disassembleChunk(currentChunk(), "code");
+	}
+#endif
 }
 
 static void expression();
