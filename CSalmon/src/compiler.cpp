@@ -55,6 +55,7 @@ static void grouping();
 static void unary();
 static void binary();
 static void number();
+static void literal();
 
 
 // 你可以看到grouping和unary是如何被插入到它们各自标识类型对应的前缀解析器列中的。
@@ -75,31 +76,31 @@ public:
 		rules[TOKEN_SEMICOLON] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_SLASH] = { NULL,     binary, PREC_FACTOR };
 		rules[TOKEN_STAR] = { NULL,     binary, PREC_FACTOR };
-		rules[TOKEN_BANG] = { NULL,     NULL,   PREC_NONE };
-		rules[TOKEN_BANG_EQUAL] = { NULL,     NULL,   PREC_NONE };
+		rules[TOKEN_BANG] = { unary,    NULL,   PREC_NONE };
+		rules[TOKEN_BANG_EQUAL] = { NULL,     binary, PREC_EQUALITY };
 		rules[TOKEN_EQUAL] = { NULL,     NULL,   PREC_NONE };
-		rules[TOKEN_EQUAL_EQUAL] = { NULL,     NULL,   PREC_NONE };
-		rules[TOKEN_GREATER] = { NULL,     NULL,   PREC_NONE };
-		rules[TOKEN_GREATER_EQUAL] = { NULL,     NULL,   PREC_NONE };
-		rules[TOKEN_LESS] = { NULL,     NULL,   PREC_NONE };
-		rules[TOKEN_LESS_EQUAL] = { NULL,     NULL,   PREC_NONE };
+		rules[TOKEN_EQUAL_EQUAL] = { NULL,     binary,   PREC_EQUALITY };
+		rules[TOKEN_GREATER] = { NULL,     binary,   PREC_COMPARISON };
+		rules[TOKEN_GREATER_EQUAL] = { NULL,     binary,   PREC_COMPARISON };
+		rules[TOKEN_LESS] = { NULL,     binary,   PREC_COMPARISON };
+		rules[TOKEN_LESS_EQUAL] = { NULL,     binary,   PREC_COMPARISON };
 		rules[TOKEN_IDENTIFIER] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_STRING] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_NUMBER] = { number,   NULL,   PREC_NONE };
 		rules[TOKEN_AND] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_CLASS] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_ELSE] = { NULL,     NULL,   PREC_NONE };
-		rules[TOKEN_FALSE] = { NULL,     NULL,   PREC_NONE };
+		rules[TOKEN_FALSE] = { literal,  NULL,   PREC_NONE };
 		rules[TOKEN_FOR] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_FUN] = { NULL,     NULL,   PREC_NONE };
-		rules[TOKEN_IF] = { NULL,     NULL,   PREC_NONE };
+		rules[TOKEN_NIL] = { literal,  NULL,   PREC_NONE };
 		rules[TOKEN_NIL] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_OR] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_PRINT] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_RETURN] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_SUPER] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_THIS] = { NULL,     NULL,   PREC_NONE };
-		rules[TOKEN_TRUE] = { NULL,     NULL,   PREC_NONE };
+		rules[TOKEN_TRUE] = { literal,  NULL,   PREC_NONE };
 		rules[TOKEN_VAR] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_WHILE] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_ERROR] = { NULL,     NULL,   PREC_NONE };
@@ -251,10 +252,26 @@ static void binary() {
 	// 当运行时，虚拟机会按顺序执行左、右操作数的代码，将它们的值留在栈上。然后它会执行操作符的指令。
 	// 这时，会从栈中弹出这两个值，计算结果，并将结果推入栈中。
 	switch (operatorType) {
+	case TOKEN_BANG_EQUAL:    emitBytes(OP_EQUAL, OP_NOT); break;
+	case TOKEN_EQUAL_EQUAL:   emitByte(OP_EQUAL); break;
+	case TOKEN_GREATER:       emitByte(OP_GREATER); break;
+	case TOKEN_GREATER_EQUAL: emitBytes(OP_LESS, OP_NOT); break;
+	case TOKEN_LESS:          emitByte(OP_LESS); break;
+	case TOKEN_LESS_EQUAL:    emitBytes(OP_GREATER, OP_NOT); break;
 	case TOKEN_PLUS:          emitByte(OP_ADD); break;
 	case TOKEN_MINUS:         emitByte(OP_SUBTRACT); break;
 	case TOKEN_STAR:          emitByte(OP_MULTIPLY); break;
 	case TOKEN_SLASH:         emitByte(OP_DIVIDE); break;
+	default: return; // Unreachable.
+	}
+}
+
+static void literal() {
+	// 因为parsePrecedence()已经消耗了关键字标识，我们需要做的就是输出正确的指令。我们根据解析出的标识的类型来确定指令。
+	switch (parser.previous.type) {
+	case TOKEN_FALSE: emitByte(OP_FALSE); break;
+	case TOKEN_NIL: emitByte(OP_NIL); break;
+	case TOKEN_TRUE: emitByte(OP_TRUE); break;
 	default: return; // Unreachable.
 	}
 }
@@ -277,7 +294,7 @@ static void number() {
 	// 我们假定数值字面量标识已经被消耗了，并被存储在previous中。我们获取该词素，并使用C标准库将其转换为一个double值。
 	double value = strtod(parser.previous.start, NULL);
 	// 然后我们用下面的函数生成加载该double值的字节码。
-	emitConstant(emitConstant(NUMBER_VAL(value)););
+	emitConstant(NUMBER_VAL(value));
 }
 
 static void unary() {
@@ -290,6 +307,7 @@ static void unary() {
 
 	// 之后，我们发出字节码执行取负运算。
 	switch (operatorType) {
+	case TOKEN_BANG: emitByte(OP_NOT); break;
 	case TOKEN_MINUS: emitByte(OP_NEGATE); break;
 	default: return; // Unreachable.
 	}

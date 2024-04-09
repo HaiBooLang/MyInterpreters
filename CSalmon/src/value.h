@@ -29,9 +29,9 @@ typedef struct {
 } Value;
 
 // 其中每个宏都接收一个适当类型的C值，并生成一个Value，其具有正确类型标签并包含底层的值。这就把静态类型的值提升到了clox的动态类型的世界。
-#define BOOL_VAL(value)   ((Value){VAL_BOOL, {.boolean = value}})
-#define NIL_VAL           ((Value){VAL_NIL, {.number = 0}})
-#define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})
+#define BOOL_VAL(value)   (Value{VAL_BOOL, {.boolean = value}})
+#define NIL_VAL           (Value{VAL_NIL, {.number = 0}})
+#define NUMBER_VAL(value) (Value{VAL_NUMBER, {.number = value}})
 // 但是为了能对Value做任何操作，我们需要将其拆包并取出对应的C值。
 #define AS_BOOL(value)    ((value).as.boolean)
 #define AS_NUMBER(value)  ((value).as.number)
@@ -55,6 +55,8 @@ void writeValueArray(ValueArray* array, Value value);
 void freeValueArray(ValueArray* array);
 
 // ------------------------------------
+bool valuesEqual(Value a, Value b);
 void printValue(Value value);
+
 
 #endif

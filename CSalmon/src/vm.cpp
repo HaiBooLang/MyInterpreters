@@ -1,9 +1,11 @@
 #include <stdarg.h>
 #include <stdio.h>
+
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
 #include "vm.h"
+
 
 // 我们声明了一个全局VM对象。反正我们只需要一个虚拟机对象，这样可以让本书中的代码在页面上更轻便。
 VM vm;
@@ -58,6 +60,13 @@ static Value peek(int distance) {
 	return vm.stackTop[-1 - distance];
 }
 
+// 对于一元取负，我们把对任何非数字的东西进行取负当作一个错误。
+// 但是Lox，像大多数脚本语言一样，在涉及到!和其它期望出现布尔值的情况下，是比较宽容的。处理其它类型的规则被称为“falsiness”。
+// Lox遵循Ruby的规定，nil和false是假的，其它的值都表现为true。
+static bool isFalsey(Value value) {
+	return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
 static InterpretResult run() {
 	// 为了使作用域更明确，宏定义本身要被限制在该函数中。我们在开始时定义了它们，然后因为我们比较关心，在结束时取消它们的定义。
 	// READ_BYTE这个宏会读取ip当前指向字节，然后推进指令指针。
@@ -106,10 +115,24 @@ static InterpretResult run() {
 			push(constant);
 			break;
 		}
-		case OP_ADD:      BINARY_OP(NUMBER_VAL, +); break;	// 这四条指令之间唯一的区别是，它们最终使用哪一个底层C运算符来组合两个操作数。
-		case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -); break;
-		case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
-		case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, /); break;
+		case OP_NIL:		push(NIL_VAL); break;
+		case OP_TRUE:		push(BOOL_VAL(true)); break;
+		case OP_FALSE:		push(BOOL_VAL(false)); break;
+		case OP_EQUAL: {
+			Value b = pop();
+			Value a = pop();
+			// 你可以对任意一对对象执行==，即使这些对象是不同类型的。这有足够的复杂性，所以有必要把这个逻辑分流到一个单独的函数中。
+			// 这个函数会一个C语言的bool值，所以我们可以安全地把结果包装在一个BOLL_VAL中。这个函数与Value有关，所以它位于“value”模块中。
+			push(BOOL_VAL(valuesEqual(a, b)));
+			break;
+		}
+		case OP_GREATER:  BINARY_OP(BOOL_VAL, > ); break;
+		case OP_LESS:     BINARY_OP(BOOL_VAL, < ); break;
+		case OP_ADD:		BINARY_OP(NUMBER_VAL, +); break;	// 这四条指令之间唯一的区别是，它们最终使用哪一个底层C运算符来组合两个操作数。
+		case OP_SUBTRACT:	BINARY_OP(NUMBER_VAL, -); break;
+		case OP_MULTIPLY:	BINARY_OP(NUMBER_VAL, *); break;
+		case OP_DIVIDE:		BINARY_OP(NUMBER_VAL, / ); break;
+		case OP_NOT:		push(BOOL_VAL(isFalsey(pop()))); break;
 		case OP_NEGATE:	// 该指令需要操作一个值，该值通过弹出栈获得。它对该值取负，然后把结果重新压入栈，以便后面的指令使用。
 			// 首先，我们检查栈顶的Value是否是一个数字。如果不是，则报告运行时错误并停止解释器。
 			if (!IS_NUMBER(peek(0))) {

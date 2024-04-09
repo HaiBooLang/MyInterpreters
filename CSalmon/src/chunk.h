@@ -12,6 +12,12 @@ typedef enum {
 	// 这些操作数以二进制数据的形式存储在指令流的操作码之后，让我们对指令的操作进行参数化。
 	// 每个操作码会定义它有多少操作数以及各自的含义。
 	OP_CONSTANT,
+	OP_NIL,
+	OP_TRUE,
+	OP_FALSE,
+	OP_EQUAL,
+	OP_GREATER,
+	OP_LESS,
 	// --------------------------------
 	// 二元操作符
 	OP_ADD,
@@ -20,6 +26,7 @@ typedef enum {
 	OP_DIVIDE,
 	// --------------------------------
 	// 一元操作符
+	OP_NOT,
 	OP_NEGATE,
 } Opcode;
 
