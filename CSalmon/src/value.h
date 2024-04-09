@@ -28,6 +28,19 @@ typedef struct {
 	} as;
 } Value;
 
+// 其中每个宏都接收一个适当类型的C值，并生成一个Value，其具有正确类型标签并包含底层的值。这就把静态类型的值提升到了clox的动态类型的世界。
+#define BOOL_VAL(value)   ((Value){VAL_BOOL, {.boolean = value}})
+#define NIL_VAL           ((Value){VAL_NIL, {.number = 0}})
+#define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})
+// 但是为了能对Value做任何操作，我们需要将其拆包并取出对应的C值。
+#define AS_BOOL(value)    ((value).as.boolean)
+#define AS_NUMBER(value)  ((value).as.number)
+// 除非我们知道Value包含适当的类型，否则使用任何的AS_宏都是不安全的。为此，我们定义最后几个宏来检查Value的类型。
+// 如果Value具有对应类型，这些宏会返回true。每当我们调用一个AS_宏时，我们都需要保证首先调用了这些宏。
+#define IS_BOOL(value)    ((value).type == VAL_BOOL)
+#define IS_NIL(value)     ((value).type == VAL_NIL)
+#define IS_NUMBER(value)  ((value).type == VAL_NUMBER)
+
 // ------------------常量池------------------
 // 常量池是一个值的数组。加载常量的指令根据数组中的索引查找该数组中的值。
 // 与字节码数组一样，编译器也无法提前知道这个数组需要多大。因此，我们需要一个动态数组。
