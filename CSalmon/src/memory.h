@@ -2,10 +2,15 @@
 #define csalmon_memory_h
 
 #include "common.h"
+#include "object.h"
 
 // 使用这个底层宏来分配一个具有给定元素类型和数量的数组。
 #define ALLOCATE(type, count) \
     (type*)reallocate(NULL, 0, sizeof(type) * (count))
+
+// 这是围绕reallocate()的一个小包装，可以将分配的内存“调整”为零字节。
+#define FREE(type, pointer) \
+    reallocate(pointer, sizeof(type), 0)
 
 // 这个宏会根据给定的当前容量计算出新的容量。
 // 为了获得我们想要的性能，重要的部分就是基于旧容量大小进行扩展。我们以2的系数增长，这是一个典型的取值。1.5是另外一个常见的选择。
@@ -26,5 +31,7 @@
 
 // 这个reallocate()函数是我们将在clox中用于所有动态内存管理的唯一函数——分配内存，释放内存以及改变现有分配的大小。
 void* reallocate(void* pointer, size_t oldSize, size_t newSize);
+
+void freeObjects();
 
 #endif

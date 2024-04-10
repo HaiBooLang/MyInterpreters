@@ -9,7 +9,6 @@
 #include "memory.h"
 #include "vm.h"
 
-
 // 我们声明了一个全局VM对象。反正我们只需要一个虚拟机对象，这样可以让本书中的代码在页面上更轻便。
 VM vm;
 
@@ -42,9 +41,14 @@ static void runtimeError(const char* format, ...) {
 
 void initVM() {
 	resetStack();
+	// 当我们第一次初始化VM时，没有分配的对象。
+	vm.objects = NULL;
 }
 
 void freeVM() {
+	// 一旦程序完成，我们就可以释放每个对象。我们现在可以也应该实现它。
+	// 像一个好的C程序一样，它会在退出之前进行清理。但在虚拟机运行时，它不会释放任何对象。
+	freeObjects();
 }
 
 void push(Value value) {

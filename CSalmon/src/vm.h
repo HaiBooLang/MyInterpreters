@@ -19,6 +19,8 @@ typedef struct {
 	// 但是，这种架构的速度快到足以在产生式语言的实现中使用。这感觉就像是在编程语言游戏中作弊。
 	Value stack[STACK_MAX];
 	Value* stackTop;
+	// VM存储一个指向表头的指针。
+	Obj* objects;
 } VM;
 
 // 当我们有一个报告静态错误的编译器和检测运行时错误的VM时，解释器会通过它来知道如何设置进程的退出代码。
@@ -27,6 +29,9 @@ typedef enum {
 	INTERPRET_COMPILE_ERROR,
 	INTERPRET_RUNTIME_ERROR
 } InterpretResult;
+
+// “object”模块直接使用了“vm”模块的vm变量，所以我们需要将该变量公开到外部。
+extern VM vm;
 
 // VM会逐步获取到一大堆它需要跟踪的状态，所以我们现在定义一个结构，把这些状态都塞进去。
 void initVM();

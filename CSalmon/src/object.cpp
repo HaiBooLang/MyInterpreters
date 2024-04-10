@@ -15,6 +15,10 @@
 static Obj* allocateObject(size_t size, ObjType type) {
 	Obj* object = (Obj*)reallocate(NULL, 0, size);
 	object->type = type;
+	// 每当我们分配一个Obj时，就将其插入到列表中。
+	// 由于这是一个单链表，所以最容易插入的地方是头部。这样，我们就不需要同时存储一个指向尾部的指针并保持对其更新。
+	object->next = vm.objects;
+	vm.objects = object;
 	return object;
 }
 

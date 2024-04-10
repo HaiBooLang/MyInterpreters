@@ -1,6 +1,7 @@
 #include <stdlib.h>
 
 #include "memory.h"
+#include "vm.h"
 
 void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
     // 当newSize为0时，我们通过调用free()来自己处理回收的情况。
@@ -21,4 +22,27 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
     if (result == NULL) exit(1);
 
     return result;
+}
+
+static void freeObject(Obj* object) {
+    switch (object->type) {
+    case OBJ_STRING: {
+        ObjString* string = (ObjString*)object;
+        // 我们不仅释放了Obj本身。因为有些对象类型还分配了它们所拥有的其它内存，我们还需要一些特定于类型的代码来处理每种对象类型的特殊需求。
+        // 在这里，这意味着我们释放字符数组，然后释放ObjString。它们都使用了最后一个内存管理宏。
+        FREE_ARRAY(char, string->chars, string->length + 1);
+        FREE(ObjString, object);
+        break;
+    }
+    }
+}
+
+
+void freeObjects() {
+    Obj* object = vm.objects;
+    while (object != NULL) {
+        Obj* next = object->next;
+        freeObject(object);
+        object = next;
+    }
 }

@@ -72,5 +72,4 @@ void freeValueArray(ValueArray* array);
 bool valuesEqual(Value a, Value b);
 void printValue(Value value);
 
-
 #endif
