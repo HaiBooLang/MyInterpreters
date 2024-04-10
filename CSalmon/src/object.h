@@ -32,7 +32,9 @@ struct ObjString {
 	char* chars;
 };
 
+ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
+void printObject(Value value);
 
 // 因为函数体使用了两次value。宏的展开方式是在主体中形参名称出现的每个地方插入实参表达式。
 // 如果一个宏中使用某个参数超过一次，则该表达式就会被求值多次。

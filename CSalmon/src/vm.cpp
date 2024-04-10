@@ -1,9 +1,12 @@
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
+#include "object.h"
+#include "memory.h"
 #include "vm.h"
 
 
@@ -67,6 +70,23 @@ static bool isFalsey(Value value) {
 	return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
 
+static void concatenate() {
+	ObjString* b = AS_STRING(pop());
+	ObjString* a = AS_STRING(pop());
+
+	// 首先，我们根据操作数的长度计算结果字符串的长度。
+	// 我们为结果分配一个字符数组，然后将两个部分复制进去。与往常一样，我们要小心地确保这个字符串被终止了。
+	int length = a->length + b->length;
+	char* chars = ALLOCATE(char, length + 1);
+	memcpy(chars, a->chars, a->length);
+	memcpy(chars + a->length, b->chars, b->length);
+	chars[length] = '\0';
+
+	// 最后，我们生成一个ObjString来包含这些字符。这次我们使用一个新函数takeString()。
+	ObjString* result = takeString(chars, length);
+	push(OBJ_VAL(result));
+}
+
 static InterpretResult run() {
 	// 为了使作用域更明确，宏定义本身要被限制在该函数中。我们在开始时定义了它们，然后因为我们比较关心，在结束时取消它们的定义。
 	// READ_BYTE这个宏会读取ip当前指向字节，然后推进指令指针。
@@ -128,7 +148,22 @@ static InterpretResult run() {
 		}
 		case OP_GREATER:  BINARY_OP(BOOL_VAL, > ); break;
 		case OP_LESS:     BINARY_OP(BOOL_VAL, < ); break;
-		case OP_ADD:		BINARY_OP(NUMBER_VAL, +); break;	// 这四条指令之间唯一的区别是，它们最终使用哪一个底层C运算符来组合两个操作数。
+		case OP_ADD: {	// 这四条指令之间唯一的区别是，它们最终使用哪一个底层C运算符来组合两个操作数。
+			// 如果两个操作数都是字符串，则连接。如果都是数字，则相加。任何其它操作数类型的组合都是一个运行时错误。
+			if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
+				concatenate();
+			}
+			else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+				double b = AS_NUMBER(pop());
+				double a = AS_NUMBER(pop());
+				push(NUMBER_VAL(a + b));
+			}
+			else {
+				runtimeError("Operands must be two numbers or two strings.");
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			break;
+		}
 		case OP_SUBTRACT:	BINARY_OP(NUMBER_VAL, -); break;
 		case OP_MULTIPLY:	BINARY_OP(NUMBER_VAL, *); break;
 		case OP_DIVIDE:		BINARY_OP(NUMBER_VAL, / ); break;
