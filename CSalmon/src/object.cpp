@@ -24,10 +24,11 @@ static Obj* allocateObject(size_t size, ObjType type) {
 
 // 它在堆上创建一个新的ObjString，然后初始化其字段。这有点像OOP语言中的构建函数。
 // 因此，它首先调用“基类”的构造函数来初始化Obj状态，使用了一个新的宏。
-static ObjString* allocateString(char* chars, int length) {
+static ObjString* allocateString(char* chars, int length, uint32_t hash) {
 	ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
 	string->length = length;
 	string->chars = chars;
+	string->hash = hash;
 	return string;
 }
 
@@ -36,7 +37,8 @@ static ObjString* allocateString(char* chars, int length) {
 // 但是，对于连接，我们已经在堆上动态地分配了一个字符数组。
 // 再做一个副本是多余的（而且意味着concatenate()必须记得释放它的副本）。相反，这个函数要求拥有传入字符串的所有权。
 ObjString* takeString(char* chars, int length) {
-	return allocateString(chars, length);
+	uint32_t hash = hashString(chars, length);
+	return allocateString(chars, length, hash);
 }
 
 // 由于连接等字符串操作，一些ObjString会在运行时被动态创建。
@@ -44,10 +46,11 @@ ObjString* takeString(char* chars, int length) {
 // 如果我们有一个ObjString存储字符串字面量，并且试图释放其中指向原始的源代码字符串的字符数组，糟糕的事情就会发生。
 // 因此，对于字面量，我们预先将字符复制到堆中。这样一来，每个ObjString都能可靠地拥有自己的字符数组，并可以释放它。
 ObjString* copyString(const char* chars, int length) {
+	uint32_t hash = hashString(chars, length);
 	char* heapChars = ALLOCATE(char, length + 1);
 	memcpy(heapChars, chars, length);
 	heapChars[length] = '\0';
-	return allocateString(heapChars, length);
+	return allocateString(heapChars, length, hash);
 }
 
 void printObject(Value value) {

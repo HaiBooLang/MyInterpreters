@@ -48,6 +48,9 @@
     <ClCompile Include="src\object.cpp">
       <Filter>头文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\table.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\common.h">
@@ -69,6 +72,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\object.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\table.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -150,6 +150,7 @@
     <ClCompile Include="src\debug.h" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\memory.cpp" />
+    <ClCompile Include="src\table.cpp" />
     <ClCompile Include="src\value.cpp" />
     <ClCompile Include="src\vm.cpp" />
   </ItemGroup>
@@ -159,6 +160,7 @@
     <ClInclude Include="src\scanner.h" />
     <ClInclude Include="src\common.h" />
     <ClInclude Include="src\memory.h" />
+    <ClInclude Include="src\table.h" />
     <ClInclude Include="src\value.h" />
     <ClInclude Include="src\vm.h" />
   </ItemGroup>
