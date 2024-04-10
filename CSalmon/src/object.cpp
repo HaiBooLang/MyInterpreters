@@ -3,6 +3,7 @@
 
 #include "memory.h"
 #include "object.h"
+#include "table.h"
 #include "value.h"
 #include "vm.h"
 
@@ -29,7 +30,22 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
 	string->length = length;
 	string->chars = chars;
 	string->hash = hash;
+	// 对于clox，我们会自动驻留每个字符串。这意味着，每当我们创建了一个新的唯一字符串，就将其添加到表中。
+	tableSet(&vm.strings, string, NIL_VAL);
 	return string;
+}
+
+// 该算法被称为“FNV-1a”，是我所知道的最短的正统哈希函数。
+// 基本思想非常简单，许多哈希函数都遵循同样的模式。从一些初始哈希值开始，通常是一个带有某些精心选择的数学特性的常量。
+// 然后遍历需要哈希的数据。对于每个字节（有些是每个字），以某种方式将比特与哈希值混合，然后将结果比特进行一些扰乱。
+// “混合”和“扰乱”的含义可以变得相当复杂。不过，最终的基本目标是均匀——我们希望得到的哈希值尽可能广泛地分散在数组范围内，以避免碰撞和聚集。
+static uint32_t hashString(const char* key, int length) {
+	uint32_t hash = 2166136261u;
+	for (int i = 0; i < length; i++) {
+		hash ^= (uint8_t)key[i];
+		hash *= 16777619;
+	}
+	return hash;
 }
 
 // 前面的copyString()函数假定它不能拥有传入的字符的所有权。
@@ -38,6 +54,13 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
 // 再做一个副本是多余的（而且意味着concatenate()必须记得释放它的副本）。相反，这个函数要求拥有传入字符串的所有权。
 ObjString* takeString(char* chars, int length) {
 	uint32_t hash = hashString(chars, length);
+	// 我们首先在字符串表中查找该字符串。
+	// 如果找到了，在返回它之前，我们释放传入的字符串的内存。因为所有权被传递给了这个函数，我们不再需要这个重复的字符串，所以由我们释放它。
+	ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+	if (interned != NULL) {
+		FREE_ARRAY(char, chars, length + 1);
+		return interned;
+	}
 	return allocateString(chars, length, hash);
 }
 
@@ -47,6 +70,11 @@ ObjString* takeString(char* chars, int length) {
 // 因此，对于字面量，我们预先将字符复制到堆中。这样一来，每个ObjString都能可靠地拥有自己的字符数组，并可以释放它。
 ObjString* copyString(const char* chars, int length) {
 	uint32_t hash = hashString(chars, length);
+	// 假定一个字符串是唯一的，这就会把它放入表中，但在此之前，我们需要实际检查字符串是否有重复。
+	// 当把一个字符串复制到新的LoxString中时，我们首先在字符串表中查找它。
+	// 如果找到了，我们就不“复制”，而是直接返回该字符串的引用。如果没有找到，我们就是落空了，则分配一个新字符串，并将其存储到字符串表中。
+	ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+	if (interned != NULL) return interned;
 	char* heapChars = ALLOCATE(char, length + 1);
 	memcpy(heapChars, chars, length);
 	heapChars[length] = '\0';

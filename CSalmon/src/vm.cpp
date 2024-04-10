@@ -43,9 +43,13 @@ void initVM() {
 	resetStack();
 	// 当我们第一次初始化VM时，没有分配的对象。
 	vm.objects = NULL;
+	// 当我们启动一个新的虚拟机时，字符串表是空的。
+	initTable(&vm.strings);
 }
 
 void freeVM() {
+	// 而当我们关闭虚拟机时，我们要清理该表使用的所有资源。
+	freeTable(&vm.strings);
 	// 一旦程序完成，我们就可以释放每个对象。我们现在可以也应该实现它。
 	// 像一个好的C程序一样，它会在退出之前进行清理。但在虚拟机运行时，它不会释放任何对象。
 	freeObjects();

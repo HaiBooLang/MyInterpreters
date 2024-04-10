@@ -38,11 +38,11 @@ bool valuesEqual(Value a, Value b) {
     case VAL_BOOL:   return AS_BOOL(a) == AS_BOOL(b);
     case VAL_NIL:    return true;
     case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
-    case VAL_OBJ: {
-        ObjString* aString = AS_STRING(a);
-        ObjString* bString = AS_STRING(b);
-        return aString->length == bString->length && memcmp(aString->chars, bString->chars, aString->length) == 0;
-    }
+    // 在创建字符串时，我们增加了一点开销来进行驻留。但作为回报，在运行时，字符串的相等操作符要快得多。
+    // 在Lox这样的动态类型语言中，这一点更为关键，因为在这种语言中，方法调用和实例属性都是在运行时根据名称查找的。
+    // 如果测试字符串是否相等是很慢的，那就意味着按名称查找方法也很慢。在面向对象的语言中，如果这一点很慢，那么一切都会变得很慢。
+    case VAL_OBJ:    return AS_OBJ(a) == AS_OBJ(b);
+
     default:         return false; // Unreachable.
     }
 }

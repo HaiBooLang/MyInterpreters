@@ -167,3 +167,27 @@ void tableAddAll(Table* from, Table* to) {
 		}
 	}
 }
+
+// 首先，我们传入的是我们要查找的键的原始字符数组，而不是ObjString。在我们调用这个方法时，还没有创建ObjString。
+ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t hash) {
+	if (table->count == 0) return NULL;
+
+	uint32_t index = hash % table->capacity;
+	for (;;) {
+		Entry* entry = &table->entries[index];
+		if (entry->key == NULL) {
+			// Stop if we find an empty non-tombstone entry.
+			if (IS_NIL(entry->value)) return NULL;
+		}
+		// 其次，在检查是否找到键时，我们要看一下实际的字符串。
+		// 我们首先看看它们的长度和哈希值是否匹配。这些都是快速检查，如果它们不相等，那些字符串肯定不一样。
+		// 如果存在哈希冲突，我们就进行实际的逐字符的字符串比较。这是虚拟机中我们真正测试字符串是否相等的一个地方。
+		// 我们在这里这样做是为了对字符串去重，然后虚拟机的其它部分可以想当然地认为，内存中不同地址的任意两个字符串一定有着不同的内容。
+		else if (entry->key->length == length && entry->key->hash == hash && memcmp(entry->key->chars, chars, length) == 0) {
+			// We found it.
+			return entry->key;
+		}
+
+		index = (index + 1) % table->capacity;
+	}
+}

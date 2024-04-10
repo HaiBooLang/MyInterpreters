@@ -57,5 +57,7 @@ bool tableSet(Table* table, ObjString* key, Value value);
 bool tableDelete(Table* table, ObjString* key);
 // 既然如此，我们也来定义一个辅助函数，将一个哈希表的所有条目复制到另一个哈希表中。
 void tableAddAll(Table* from, Table* to);
+// 要在表中查找字符串，我们不能使用普通的tableGet()函数，因为它调用了findEntry()，这正是我们现在试图解决的重复字符串的问题。
+ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t hash);
 
 #endif
