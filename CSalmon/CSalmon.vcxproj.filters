@@ -45,6 +45,9 @@
     <ClCompile Include="src\scanner.cpp">
       <Filter>头文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\object.cpp">
+      <Filter>头文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\common.h">
@@ -63,6 +66,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\scanner.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\object.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
