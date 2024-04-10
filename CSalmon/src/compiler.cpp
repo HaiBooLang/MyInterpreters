@@ -56,6 +56,7 @@ static void unary();
 static void binary();
 static void number();
 static void literal();
+static void string();
 
 
 // 你可以看到grouping和unary是如何被插入到它们各自标识类型对应的前缀解析器列中的。
@@ -85,7 +86,7 @@ public:
 		rules[TOKEN_LESS] = { NULL,     binary,   PREC_COMPARISON };
 		rules[TOKEN_LESS_EQUAL] = { NULL,     binary,   PREC_COMPARISON };
 		rules[TOKEN_IDENTIFIER] = { NULL,     NULL,   PREC_NONE };
-		rules[TOKEN_STRING] = { NULL,     NULL,   PREC_NONE };
+		rules[TOKEN_STRING] = { string,   NULL,   PREC_NONE };
 		rules[TOKEN_NUMBER] = { number,   NULL,   PREC_NONE };
 		rules[TOKEN_AND] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_CLASS] = { NULL,     NULL,   PREC_NONE };
@@ -295,6 +296,11 @@ static void number() {
 	double value = strtod(parser.previous.start, NULL);
 	// 然后我们用下面的函数生成加载该double值的字节码。
 	emitConstant(NUMBER_VAL(value));
+}
+
+static void string() {
+	// 这里直接从词素中获取字符串的字符。+1和-2部分去除了开头和结尾的引号。然后，它创建了一个字符串对象，将其包装为一个Value，并塞入常量表中。
+	emitConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
 static void unary() {
