@@ -43,11 +43,14 @@ void initVM() {
 	resetStack();
 	// 当我们第一次初始化VM时，没有分配的对象。
 	vm.objects = NULL;
+	// 我们需要在虚拟机启动时将哈希表初始化为有效状态。
+	initTable(&vm.globals);
 	// 当我们启动一个新的虚拟机时，字符串表是空的。
 	initTable(&vm.strings);
 }
 
 void freeVM() {
+	freeTable(&vm.globals);
 	// 而当我们关闭虚拟机时，我们要清理该表使用的所有资源。
 	freeTable(&vm.strings);
 	// 一旦程序完成，我们就可以释放每个对象。我们现在可以也应该实现它。
@@ -101,6 +104,9 @@ static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
 	// READ_CONTANT()从字节码中读取下一个字节，将得到的数字作为索引，并在代码块的常量表中查找相应的Value。
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+	// 它从字节码块中读取一个1字节的操作数。它将其视为字节码块的常量表的索引，并返回该索引处的字符串。
+	// 它不检查该值是否是字符串——它只是不加区分地进行类型转换。这是安全的，因为编译器永远不会发出引用非字符串常量的指令。
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 	// 围绕这个核心算术表达式的是一些模板代码，用于从栈中获取数值，并将结果结果压入栈中。
 	// 这个宏需要扩展为一系列语句。作为一个谨慎的宏作者，我们要确保当宏展开时，这些语句都在同一个作用域内。
 	// 在宏中使用do while循环看起来很滑稽，但它提供了一种方法，可以在一个代码块中包含多个语句，并且允许在末尾使用分号。
@@ -146,6 +152,15 @@ static InterpretResult run() {
 		case OP_NIL:		push(NIL_VAL); break;
 		case OP_TRUE:		push(BOOL_VAL(true)); break;
 		case OP_FALSE:		push(BOOL_VAL(false)); break;
+		case OP_DEFINE_GLOBAL: {
+			// 我们从常量表中获取变量的名称，然后我们从栈顶获取值，并以该名称为键将其存储在哈希表中。
+			// 这段代码并没有检查键是否已经在表中。Lox对全局变量的处理非常宽松，允许你重新定义它们而且不会出错。
+			// 这在REPL会话中很有用，如果键恰好已经在哈希表中，虚拟机通过简单地覆盖值来支持这一点。
+			ObjString* name = READ_STRING();
+			tableSet(&vm.globals, name, peek(0));
+			pop();
+			break;
+		}
 		case OP_POP:		pop(); break;
 		case OP_EQUAL: {
 			Value b = pop();
@@ -205,6 +220,7 @@ static InterpretResult run() {
 
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef READ_STRING
 #undef BINARY_OP
 }
 

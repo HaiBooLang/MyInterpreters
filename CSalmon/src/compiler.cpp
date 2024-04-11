@@ -306,6 +306,43 @@ static void expression() {
 	parsePrecedence(PREC_ASSIGNMENT);
 }
 
+// 这个函数接受给定的标识，并将其词素作为一个字符串添加到字节码块的常量表中。然后，它会返回该常量在常量表中的索引。
+static uint8_t identifierConstant(Token* name) {
+	return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
+}
+ 
+static uint8_t parseVariable(const char* errorMessage) {
+	consume(TOKEN_IDENTIFIER, errorMessage);
+	return identifierConstant(&parser.previous);
+}
+
+// 它会输出字节码指令，用于定义新变量并存储其初始化值。变量名在常量表中的索引是该指令的操作数。
+// 在基于堆栈的虚拟机中，我们通常是最后发出这条指令。
+// 在运行时，我们首先执行变量初始化器的代码，将值留在栈中。然后这条指令会获取该值并保存起来，以供日后使用。
+static void defineVariable(uint8_t global) {
+	emitBytes(OP_DEFINE_GLOBAL, global);
+}
+
+static void varDeclaration() {
+	// 关键字后面跟着变量名。它是由parseVariable()编译的。
+	uint8_t global = parseVariable("Expect variable name.");
+
+	if (match(TOKEN_EQUAL)) {
+		// 然后我们会寻找一个=，后跟初始化表达式。
+		expression();
+	}
+	else {
+		// 如果用户没有初始化变量，编译器会生成OP_NIL指令隐式地将其初始化为nil。
+		emitByte(OP_NIL);
+	}
+	consume(TOKEN_SEMICOLON,
+		"Expect ';' after variable declaration.");
+
+	// 全局变量在运行时是按名称查找的。这意味着虚拟机（字节码解释器循环）需要访问该名称。
+	// 整个字符串太大，不能作为操作数塞进字节码流中。相反，我们将字符串存储到常量表中，然后指令通过该名称在表中的索引来引用它。
+	defineVariable(global);
+}
+
 static void synchronize() {
 	parser.panicMode = false;
 
@@ -334,7 +371,12 @@ static void synchronize() {
 }
 
 static void declaration() {
-	statement();
+	if (match(TOKEN_VAR)) {
+		varDeclaration();
+	}
+	else {
+		statement();
+	}
 	// 与jlox一样，clox也使用了恐慌模式下的错误恢复来减少它所报告的级联编译错误。
 	// 当编译器到达同步点时，就退出恐慌模式。对于Lox来说，我们选择语句边界作为同步点。
 	// 如果我们在解析前一条语句时遇到编译错误，我们就会进入恐慌模式。当这种情况发生时，我们会在这条语句之后开始同步。
