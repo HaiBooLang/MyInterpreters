@@ -162,6 +162,20 @@ static InterpretResult run() {
 			break;
 		}
 		case OP_POP:		pop(); break;
+		case OP_GET_GLOBAL: {
+			// 我们从指令操作数中提取常量表索引并获得变量名称。然后我们使用它作为键，在全局变量哈希表中查找变量的值。
+			ObjString* name = READ_STRING();
+			Value value;
+			// 如果该键不在哈希表中，就意味着这个全局变量从未被定义过。
+			// 这在Lox中是运行时错误，所以如果发生这种情况，我们要报告错误并退出解释器循环。
+			if (!tableGet(&vm.globals, name, &value)) {
+				runtimeError("Undefined variable '%s'.", name->chars);
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			// 否则，我们获取该值并将其压入栈中。
+			push(value);
+			break;
+		}
 		case OP_EQUAL: {
 			Value b = pop();
 			Value a = pop();

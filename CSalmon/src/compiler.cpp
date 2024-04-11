@@ -58,7 +58,7 @@ static void binary();
 static void number();
 static void literal();
 static void string();
-
+static void variable();
 
 // 你可以看到grouping和unary是如何被插入到它们各自标识类型对应的前缀解析器列中的。
 // 在下一列中，binary被连接到四个算术中缀操作符上。这些中缀操作符的优先级也设置在最后一列。
@@ -86,7 +86,7 @@ public:
 		rules[TOKEN_GREATER_EQUAL] = { NULL,     binary,   PREC_COMPARISON };
 		rules[TOKEN_LESS] = { NULL,     binary,   PREC_COMPARISON };
 		rules[TOKEN_LESS_EQUAL] = { NULL,     binary,   PREC_COMPARISON };
-		rules[TOKEN_IDENTIFIER] = { NULL,     NULL,   PREC_NONE };
+		rules[TOKEN_IDENTIFIER] = { variable, NULL,   PREC_NONE };
 		rules[TOKEN_STRING] = { string,   NULL,   PREC_NONE };
 		rules[TOKEN_NUMBER] = { number,   NULL,   PREC_NONE };
 		rules[TOKEN_AND] = { NULL,     NULL,   PREC_NONE };
@@ -421,6 +421,17 @@ static void number() {
 static void string() {
 	// 这里直接从词素中获取字符串的字符。+1和-2部分去除了开头和结尾的引号。然后，它创建了一个字符串对象，将其包装为一个Value，并塞入常量表中。
 	emitConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
+}
+
+// 这里会调用与之前相同的identifierConstant()函数，以获取给定的标识符标识，并将其词素作为字符串添加到字节码块的常量表中。
+// 剩下的工作就是生成一条指令，加载具有该名称的全局变量。
+static void namedVariable(Token name) {
+	uint8_t arg = identifierConstant(&name);
+	emitBytes(OP_GET_GLOBAL, arg);
+}
+
+static void variable() {
+	namedVariable(parser.previous);
 }
 
 static void unary() {
