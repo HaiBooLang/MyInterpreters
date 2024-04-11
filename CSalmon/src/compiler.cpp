@@ -5,6 +5,7 @@
 #include "common.h"
 #include "compiler.h"
 #include "scanner.h"
+
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
 #endif
@@ -194,6 +195,19 @@ static void consume(TokenType type, const char* message) {
 	errorAtCurrent(message);
 }
 
+// 如果当前标识符合给定的类型，check()函数返回true。
+// 将它封装在一个函数中似乎有点傻，但我们以后会更多地使用它，而且我们认为像这样简短的动词命名的函数使解析器更容易阅读。
+static bool check(TokenType type) {
+	return parser.current.type == type;
+}
+
+// 如果当前的标识是指定类型，我们就消耗该标识并返回true。否则，我们就不处理该标识并返回false。
+static bool match(TokenType type) {
+	if (!check(type)) return false;
+	advance();
+	return true;
+}
+
 // 在我们解析并理解了用户的一段程序之后，下一步是将其转换为一系列字节码指令。
 static void emitByte(uint8_t byte) {
 	writeChunk(currentChunk(), byte, parser.previous.line);
@@ -236,6 +250,8 @@ static void endCompiler() {
 }
 
 static void expression();
+static void statement();
+static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
@@ -288,6 +304,68 @@ static void grouping() {
 static void expression() {
 	// 我们只需要解析最低优先级，它也包含了所有更高优先级的表达式。
 	parsePrecedence(PREC_ASSIGNMENT);
+}
+
+static void synchronize() {
+	parser.panicMode = false;
+
+	// 我们会不分青红皂白地跳过标识，直到我们到达一个看起来像是语句边界的位置。
+	// 我们识别边界的方式包括，查找可以结束一条语句的前驱标识，如分号；
+	// 或者我们可以查找能够开始一条语句的后续标识，通常是控制流或声明语句的关键字之一。
+	while (parser.current.type != TOKEN_EOF) {
+		if (parser.previous.type == TOKEN_SEMICOLON) return;
+		switch (parser.current.type) {
+		case TOKEN_CLASS:
+		case TOKEN_FUN:
+		case TOKEN_VAR:
+		case TOKEN_FOR:
+		case TOKEN_IF:
+		case TOKEN_WHILE:
+		case TOKEN_PRINT:
+		case TOKEN_RETURN:
+			return;
+
+		default:
+			; // Do nothing.
+		}
+
+		advance();
+	}
+}
+
+static void declaration() {
+	statement();
+	// 与jlox一样，clox也使用了恐慌模式下的错误恢复来减少它所报告的级联编译错误。
+	// 当编译器到达同步点时，就退出恐慌模式。对于Lox来说，我们选择语句边界作为同步点。
+	// 如果我们在解析前一条语句时遇到编译错误，我们就会进入恐慌模式。当这种情况发生时，我们会在这条语句之后开始同步。
+	if (parser.panicMode) synchronize();
+}
+
+static void printStatement() {
+	// print语句会对表达式求值并打印出结果，所以我们首先解析并编译这个表达式。
+	expression();
+	// 语法要求在表达式之后有一个分号，所以我们消耗一个分号标识。
+	consume(TOKEN_SEMICOLON, "Expect ';' after value.");
+	// 最后，我们生成一条新指令来打印结果。
+	emitByte(OP_PRINT);
+}
+
+// “表达式语句”就是一个表达式后面跟着一个分号。这是在需要语句的上下文中写表达式的方式。
+// 通常来说，这样你就可以调用函数或执行赋值操作以触发其副作用。
+// 从语义上说，表达式语句会对表达式求值并丢弃结果。编译器直接对这种行为进行编码。它会编译表达式，然后生成一条OP_POP指令。
+static void expressionStatement() {
+	expression();
+	consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+	emitByte(OP_POP);
+}
+
+static void statement() {
+	if (match(TOKEN_PRINT)) {
+		printStatement();
+	}
+	else {
+		expressionStatement();
+	}
 }
 
 // 为了编译数值字面量，我们在数组的TOKEN_NUMBER索引处存储一个指向下面函数的指针。
@@ -355,10 +433,11 @@ bool compile(const char* source, Chunk* chunk) {
 
 	// 对advance()的调用会在扫描器上“启动泵”。
 	advance();
-	// 然后我们解析一个表达式。我们还不打算处理语句，所以表达式是我们支持的唯一的语法子集。
-	expression();
-	// 在编译表达式之后，我们应该处于源代码的末尾，所以我们要检查EOF标识。
-	consume(TOKEN_EOF, "Expect end of expression.");
+
+	// 我们会一直编译声明语句，直到到达源文件的结尾。
+	while (!match(TOKEN_EOF)) {
+		declaration();
+	}
 
 	endCompiler();
 

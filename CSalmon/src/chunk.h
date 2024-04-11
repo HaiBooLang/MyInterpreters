@@ -7,6 +7,7 @@
 
 // 在我们的字节码格式中，每个指令都有一个字节的操作码（通常简称为opcode）。这个数字控制我们要处理的指令类型——加、减、查找变量等。
 typedef enum {
+	OP_PRINT,
 	OP_RETURN,
 	// 当VM执行常量指令时，它会“加载”常量以供使用。我们的字节码像大多数其它字节码一样，允许指令有操作数。
 	// 这些操作数以二进制数据的形式存储在指令流的操作码之后，让我们对指令的操作进行参数化。
@@ -15,6 +16,7 @@ typedef enum {
 	OP_NIL,
 	OP_TRUE,
 	OP_FALSE,
+	OP_POP,
 	OP_EQUAL,
 	OP_GREATER,
 	OP_LESS,

@@ -146,6 +146,7 @@ static InterpretResult run() {
 		case OP_NIL:		push(NIL_VAL); break;
 		case OP_TRUE:		push(BOOL_VAL(true)); break;
 		case OP_FALSE:		push(BOOL_VAL(false)); break;
+		case OP_POP:		pop(); break;
 		case OP_EQUAL: {
 			Value b = pop();
 			Value a = pop();
@@ -176,7 +177,7 @@ static InterpretResult run() {
 		case OP_MULTIPLY:	BINARY_OP(NUMBER_VAL, *); break;
 		case OP_DIVIDE:		BINARY_OP(NUMBER_VAL, / ); break;
 		case OP_NOT:		push(BOOL_VAL(isFalsey(pop()))); break;
-		case OP_NEGATE:	// 该指令需要操作一个值，该值通过弹出栈获得。它对该值取负，然后把结果重新压入栈，以便后面的指令使用。
+		case OP_NEGATE:		// 该指令需要操作一个值，该值通过弹出栈获得。它对该值取负，然后把结果重新压入栈，以便后面的指令使用。
 			// 首先，我们检查栈顶的Value是否是一个数字。如果不是，则报告运行时错误并停止解释器。
 			if (!IS_NUMBER(peek(0))) {
 				runtimeError("Operand must be a number.");
@@ -185,9 +186,18 @@ static InterpretResult run() {
 			// 否则，我们就继续运行。只有在验证之后，我们才会拆装操作数，取负，将结果封装并压入栈。
 			push(NUMBER_VAL(-AS_NUMBER(pop())));
 			break;
-		case OP_RETURN: {
+		case OP_PRINT: {	// 当解释器到达这条指令时，它已经执行了表达式的代码，将结果值留在了栈顶。现在我们只需要弹出该值并打印。
+			// 请注意，在此之后我们不会再向栈中压入任何内容。
+			// 这是虚拟机中表达式和语句之间的一个关键区别。每个字节码指令都有堆栈效应，这个值用于描述指令如何修改堆栈内容。
+			// 你可以把一系列指令的堆栈效应相加，得到它们的总体效应。
+			// 如果把从任何一个完整的表达式中编译得到的一系列指令的堆栈效应相加，其总数是1。每个表达式会在栈中留下一个结果值。
+			// 整个语句对应字节码的总堆栈效应为0。因为语句不产生任何值，所以它最终会保持堆栈不变，尽管它在执行自己的操作时难免会使用堆栈。
+			// 这一点很重要，因为等我们涉及到控制流和循环时，一个程序可能会执行一长串的语句。如果每条语句都增加或减少堆栈，最终就可能会溢出或下溢。
 			printValue(pop());
 			printf("\n");
+			break;
+		}
+		case OP_RETURN: {
 			return INTERPRET_OK;
 		}
 		}
