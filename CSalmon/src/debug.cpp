@@ -34,6 +34,14 @@ static int byteInstruction(const char* name, Chunk* chunk, int offset) {
 	return offset + 2;
 }
 
+// 这两条指令具有新格式，有着16位的操作数，因此我们添加了一个新的工具函数来反汇编它们。
+static int jumpInstruction(const char* name, int sign, Chunk* chunk, int offset) {
+	uint16_t jump = (uint16_t)(chunk->code[offset + 1] << 8);
+	jump |= chunk->code[offset + 2];
+	printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+	return offset + 3;
+}
+
 int disassembleInstruction(Chunk* chunk, int offset) {
 	// 首先，它会打印给定指令的字节偏移量——这能告诉我们当前指令在字节码块中的位置。当我们在字节码中实现控制流和跳转时，这将是一个有用的路标。
 	printf("%04d ", offset);
@@ -90,6 +98,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
 		return simpleInstruction("OP_NEGATE", offset);
 	case OP_PRINT:
 		return simpleInstruction("OP_PRINT", offset);
+	case OP_JUMP:
+		return jumpInstruction("OP_JUMP", 1, chunk, offset);
+	case OP_JUMP_IF_FALSE:
+		return jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
 	case OP_RETURN:
 		return simpleInstruction("OP_RETURN", offset);
 		// 如果给定的字节看起来根本不像一条指令——这是我们编译器的一个错误——我们也要打印出来。

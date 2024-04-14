@@ -15,6 +15,19 @@
 // 因为编译器在生产代码时只能“管窥”用户的程序，所以语言必须设计成不需要太多外围的上下文环境就能理解一段语法。
 // 幸运的是，微小的、动态类型的Lox非常适合这种情况。
 
+// 你会注意到，我们写的几乎所有的代码都在编译器中。在运行时，只有两个小指令。
+// 你会看到，相比于jlox，这是clox中的一个持续的趋势。优化器工具箱中最大的锤子就是把工作提前到编译器中，这样你就不必在运行时做这些工作了。
+// 在本章中，这意味着要准确地解析每个局部变量占用的栈槽。这样，在运行时就不需要进行查找或解析。
+
+// 当我们谈论“控制流”时，我们指的是什么？我们所说的“流”是指执行过程在程序文本中的移动方式。
+// 在jlox中，机器人的关注点（当前代码位）是隐式的，它取决于哪些AST节点被存储在各种Java变量中，以及我们正在运行的Java代码是什么。
+// 在clox中，它要明确得多。VM的ip字段存储了当前字节码指令的地址。该字段的值正是我们在程序中的“位置”。
+// 执行操作通常是通过增加ip进行的。但是我们可以随意地改变这个变量。为了实现控制流，所需要做的就是以更有趣的方式改变ip。
+// 要想跳过一大块代码，我们只需将ip字段设置为其后代码的字节码指令的地址。为了有条件地跳过一些代码，我们需要一条指令来查看栈顶的值。
+// 如果它是假，就在ip上增加一个给定的偏移量，跳过一系列指令。否则，它什么也不做，并照常执行下一条指令。
+// 当我们编译成字节码时，代码中显式的嵌套块结构就消失了，只留下一系列扁平的指令。Lox是一种结构化的编程语言，但clox字节码却不是。
+// 正确的（或者说错误的，取决于你怎么看待它）字节码指令集可以跳转到代码块的中间位置，或从一个作用域跳到另一个作用域。
+
 // 我们维护一个这种结构体类型的单一全局变量，所以我们不需要在编译器中将状态从一个函数传递到另一个函数。
 typedef struct {
 	Token current;
@@ -503,6 +516,62 @@ static void printStatement() {
 	emitByte(OP_PRINT);
 }
 
+// 第一个程序会生成一个字节码指令，并为跳转偏移量写入一个占位符操作数。
+// 我们把操作码作为参数传入，因为稍后我们会有两个不同的指令都使用这个辅助函数。
+// 我们使用两个字节作为跳转偏移量的操作数。一个16位的偏移量可以让我们跳转65535个字节的代码，这对于我们的需求来说应该足够了。
+static int emitJump(uint8_t instruction) {
+	emitByte(instruction);
+	emitByte(0xff);
+	emitByte(0xff);
+	return currentChunk()->count - 2;
+}
+
+// 该函数会返回生成的指令在字节码块中的偏移量。编译完then分支后，我们将这个偏移量传递给这个函数。
+// 这个函数会返回到字节码中，并将给定位置的操作数替换为计算出的跳转偏移量。
+// 我们在生成下一条希望跳转的指令之前调用patchJump()，因此会使用当前字节码计数来确定要跳转的距离。
+static void patchJump(int offset) {
+	// -2 to adjust for the bytecode for the jump offset itself.
+	int jump = currentChunk()->count - offset - 2;
+
+	if (jump > UINT16_MAX) {
+		error("Too much code to jump over.");
+	}
+
+	currentChunk()->code[offset] = (jump >> 8) & 0xff;
+	currentChunk()->code[offset + 1] = jump & 0xff;
+}
+
+static void ifStatement() {
+	// 首先我们编译条件表达式（用小括号括起来）。在运行时，这会将条件值留在栈顶。我们将通过它来决定是执行then分支还是跳过它。
+	consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
+	expression();
+	consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+
+	// 然后我们生成一个新的OP_JUMP_IF_ELSE指令。
+	// 这条指令有一个操作数，用来表示ip的偏移量——要跳过多少字节的代码。如果条件是假，它就按这个值调整ip。
+	int thenJump = emitJump(OP_JUMP_IF_FALSE);
+	// 我们可以让OP_JUMP_IF_FALSE指令自身弹出条件值，但很快我们会对不希望弹出条件值的逻辑运算符使用相同的指令。
+	// 相对地，我们在编译if语句时，会让编译器生成几条显式的OP_POP指令，我们需要注意生成的代码中的每一条执行路径都要弹出条件值。
+	emitByte(OP_POP);
+	statement();
+
+	int elseJump = emitJump(OP_JUMP);
+
+	// 但我们有个问题。当我们写OP_JUMP_IF_FALSE指令的操作数时，我们怎么知道要跳多远？
+	// 为了解决这个问题，我们使用了一个经典的技巧，叫作回填（backpatching）。
+	// 我们首先生成跳转指令，并附上一个占位的偏移量操作数，我们跟踪这个半成品指令的位置。
+	// 接下来，我们编译then主体。一旦完成，我们就知道要跳多远。所以我们回去将占位符替换为真正的偏移量，现在我们可以计算它了。
+	patchJump(thenJump);
+	emitByte(OP_POP);
+
+	// 当条件为假时，我们会跳过then分支。如果存在else分支，ip就会出现在其字节码的开头处。
+	if (match(TOKEN_ELSE)) statement();
+
+	// 当条件为真时，执行完then分支后，我们需要跳过else分支。
+	// 在执行完then分支后，会跳转到else分支之后的下一条语句。与其它跳转不同，这个跳转是无条件的。我们一定会接受该跳转，所以我们需要另一条指令来表达它。
+	patchJump(elseJump);
+}
+
 // 执行代码块只是意味着一个接一个地执行其中包含的语句，所以不需要编译它们。
 // 从语义上讲，块所做的事就是创建作用域。在我们编译块的主体之前，我们会调用这个函数进入一个新的局部作用域。
 static void beginScope() {
@@ -541,6 +610,9 @@ static void expressionStatement() {
 static void statement() {
 	if (match(TOKEN_PRINT)) {
 		printStatement();
+	} 
+	else if (match(TOKEN_IF)) {
+		ifStatement();
 	}
 	else if (match(TOKEN_LEFT_BRACE)) {
 		beginScope();

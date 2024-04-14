@@ -104,6 +104,8 @@ static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
 	// READ_CONTANT()从字节码中读取下一个字节，将得到的数字作为索引，并在代码块的常量表中查找相应的Value。
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+	// 它从字节码块中抽取接下来的两个字节，并从中构建出一个16位无符号整数。
+#define READ_SHORT() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
 	// 它从字节码块中读取一个1字节的操作数。它将其视为字节码块的常量表的索引，并返回该索引处的字符串。
 	// 它不检查该值是否是字符串——它只是不加区分地进行类型转换。这是安全的，因为编译器永远不会发出引用非字符串常量的指令。
 #define READ_STRING() AS_STRING(READ_CONSTANT())
@@ -252,6 +254,23 @@ static InterpretResult run() {
 			printf("\n");
 			break;
 		}
+		case OP_JUMP: {
+			// 这里没有什么特别出人意料的——唯一的区别就是它不检查条件，并且一定会应用偏移量。
+			uint16_t offset = READ_SHORT();
+			vm.ip += offset;
+			break;
+		}
+		case OP_JUMP_IF_FALSE: {	
+			// 这是我们添加的第一个需要16位操作数的指令。为了从字节码块中读出这个指令，需要使用一个新的宏。
+			uint16_t offset = READ_SHORT();
+			// 读取偏移量之后，我们检查栈顶的条件值。如果是假，我们就将这个跳转偏移量应用到ip上。
+			// 否则，我们就保持ip不变，执行会自动进入跳转指令的下一条指令。
+			// 在条件为假的情况下，我们不需要做任何其它工作。
+			// 我们已经移动了ip，所以当外部指令调度循环再次启动时，将会在新指令处执行，跳过了then分支的所有代码。
+			// 请注意，跳转指令并没有将条件值弹出栈。因此，我们在这里还没有全部完成，因为还在堆栈上留下了一个额外的值。我们很快就会把它清理掉。
+			if (isFalsey(peek(0))) vm.ip += offset;
+			break;
+		}
 		case OP_RETURN: {
 			return INTERPRET_OK;
 		}
@@ -259,6 +278,7 @@ static InterpretResult run() {
 	}
 
 #undef READ_BYTE
+#undef READ_SHORT
 #undef READ_CONSTANT
 #undef READ_STRING
 #undef BINARY_OP
