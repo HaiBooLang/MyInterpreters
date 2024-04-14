@@ -24,8 +24,16 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
     return result;
 }
 
+// 当我们使用完一个函数对象后，必须将它借用的比特位返还给操作系统。
 static void freeObject(Obj* object) {
     switch (object->type) {
+    case OBJ_FUNCTION: {
+        // 这个switch语句负责释放ObjFunction本身以及它所占用的其它内存。函数拥有自己的字节码块，所以我们调用Chunk中类似析构器的函数。
+        ObjFunction* function = (ObjFunction*)object;
+        freeChunk(&function->chunk);
+        FREE(ObjFunction, object);
+        break;
+    }
     case OBJ_STRING: {
         ObjString* string = (ObjString*)object;
         // 我们不仅释放了Obj本身。因为有些对象类型还分配了它们所拥有的其它内存，我们还需要一些特定于类型的代码来处理每种对象类型的特殊需求。

@@ -11,6 +11,16 @@
 #define ALLOCATE_OBJ(type, objectType) \
     (type*)allocateObject(sizeof(type), objectType)
 
+// 我们使用好朋友ALLOCATE_OBJ()来分配内存并初始化对象的头信息，以便虚拟机知道它是什么类型的对象。
+// 我们没有像对ObjString那样传入参数来初始化函数，而是将函数设置为一种空白状态——零参数、无名称、无代码。这里会在稍后创建函数后被填入数据。
+ObjFunction* newFunction() {
+	ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
+	function->arity = 0;
+	function->name = NULL;
+	initChunk(&function->chunk);
+	return function;
+}
+
 // 它在堆上分配了一个给定大小的对象。
 // 注意，这个大小不仅仅是Obj本身的大小。调用者传入字节数，以便为被创建的对象类型留出额外的载荷字段所需的空间。
 static Obj* allocateObject(size_t size, ObjType type) {
@@ -81,8 +91,16 @@ ObjString* copyString(const char* chars, int length) {
 	return allocateString(heapChars, length, hash);
 }
 
+static void printFunction(ObjFunction* function) {
+	// 既然函数知道它的名称，那就应该说出来。
+	printf("<fn %s>", function->name->chars);
+}
+
 void printObject(Value value) {
 	switch (OBJ_TYPE(value)) {
+	case OBJ_FUNCTION:
+		printFunction(AS_FUNCTION(value));
+		break;
 	case OBJ_STRING:
 		printf("%s", AS_CSTRING(value));
 		break;

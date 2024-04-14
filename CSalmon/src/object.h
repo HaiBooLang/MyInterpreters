@@ -2,17 +2,21 @@
 #define csalmon_object_h
 
 #include "common.h"
+#include "chunk.h"
 #include "value.h"
 
 // 因为我们会经常访问这些标记类型，所以有必要编写一个宏，从给定的Value中提取对象类型标签。
 #define OBJ_TYPE(value)        (AS_OBJ(value)->type)
+#define IS_FUNCTION(value)     isObjType(value, OBJ_FUNCTION)
 // 给定一个Obj*，你可以将其“向下转换”为一个/ObjString*。当然，你需要确保你的Obj*指针确实指向一个实际的ObjString中的obj字段。
 // 否则，你就会不安全地重新解释内存中的随机比特位。为了检测这种类型转换是否安全，我们再添加另一个宏。
 #define IS_STRING(value)       isObjType(value, OBJ_STRING)
+#define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
 
 typedef enum {
+	OBJ_FUNCTION,
 	OBJ_STRING,
 } ObjType;
 
@@ -23,6 +27,15 @@ struct Obj {
 	// 我们可以定义一个单独的链表节点结构体，但那样我们也必须分配这些节点。相反，我们会使用侵入式列表——Obj结构体本身将作为链表节点。
 	struct Obj* next;
 };
+
+// 函数是Lox中的一等公民，所以它们需要作为实际的Lox对象。因此，ObjFunction具有所有对象类型共享的Obj头。
+// arity字段存储了函数所需要的参数数量。然后，除了字节码块，我们还需要存储函数名称。这有助于报告可读的运行时错误。
+typedef struct {
+	Obj obj;
+	int arity;
+	Chunk chunk;
+	ObjString* name;
+} ObjFunction;
 
 // 字符串对象中包含一个字符数组。
 // 这些字符存储在一个单独的、由堆分配的数组中，这样我们就可以按需为每个字符串留出空间。我们还会保存数组中的字节数。
@@ -40,6 +53,8 @@ struct ObjString {
 	// 提前缓存它是有道理的：分配字符串并复制其字符已然是一个O(n)的操作了，所以这是一个很好的时机来执行字符串哈希的O(n)计算。
 	uint32_t hash;
 };
+
+ObjFunction* newFunction();
 
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
