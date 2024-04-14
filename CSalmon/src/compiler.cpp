@@ -25,6 +25,11 @@ typedef struct {
 	bool panicMode;
 } Parser;
 
+// 如果我们是有原则的工程师，我们应该给前端的每个函数添加一个参数，接受一个指向Compiler的指针。
+// 我们在一开始就创建一个Compiler，并小心地在将它贯穿于每个函数的调用中……
+// 但这意味着要对我们已经写好的代码进行大量无聊的修改，所以这里用一个全局变量代替。
+Compiler* current = NULL;
+
 // 为了把“优先级”作为一个参数，我们用数值来定义它。
 // 这些是Salmon中的所有优先级，按照从低到高的顺序排列。由于C语言会隐式地为枚举赋值连续递增的数字，这就意味着PREC_CALL在数值上比PREC_UNARY要大。
 typedef enum {
@@ -52,6 +57,28 @@ typedef struct {
 	ParseFn infix;
 	Precedence precedence;
 } ParseRule;
+
+// 我们存储变量的名称。当我们解析一个标识符时，会将标识符的词素与每个局部变量名称进行比较，以找到一个匹配项。
+typedef struct {
+	Token name;
+	// depth字段记录了声明局部变量的代码块的作用域深度。这就是我们现在需要的所有状态。
+	int depth;
+} Local;
+
+// 在jlox中，我们使用“环境”HashMap链来跟踪当前在作用域中的局部变量。
+// 这是一种经典的、教科书式的词法作用域表示方式。对于clox，像往常一样，我们更接近于硬件。所有的状态都保存了一个新的结构体中。
+// 我们有一个简单、扁平的数组，其中包含了编译过程中每个时间点上处于作用域内的所有局部变量。
+// 它们在数组中的顺序与它们的声明在代码中出现的顺序相同。
+// 由于我们用来编码局部变量的指令操作数是一个字节，所以我们的虚拟机对同时处于作用域内的局部变量的数量有一个硬性限制。
+// 这意味着我们也可以给局部变量数组一个固定的大小。
+typedef struct {
+	Local locals[UINT8_COUNT];
+	// localCount字段记录了作用域中有多少局部变量——有多少个数组槽在使用。
+	int localCount;
+	// 我们还会跟踪“作用域深度”。这指的是我们正在编译的当前代码外围的代码块数量。
+	// 0是全局作用域，1是第一个顶层块，2是它内部的块，你懂的。我们用它来跟踪每个局部变量属于哪个块，这样当一个块结束时，我们就知道该删除哪些局部变量。
+	int scopeDepth;
+} Compiler;
 
 static void binary(bool canAssign);
 static void literal(bool canAssign);
@@ -238,6 +265,13 @@ static uint8_t makeConstant(Value value) {
 static void emitConstant(Value value) {
 	// 首先，我们将值添加到常量表中，然后我们发出一条OP_CONSTANT指令，在运行时将其压入栈中。
 	emitBytes(OP_CONSTANT, makeConstant(value));
+}
+
+// 当我们第一次启动虚拟机时，我们会调用它使所有东西进入一个干净的状态。
+static void initCompiler(Compiler* compiler) {
+	compiler->localCount = 0;
+	compiler->scopeDepth = 0;
+	current = compiler;
 }
 
 static void endCompiler() {
@@ -498,6 +532,9 @@ static ParseRule* getRule(TokenType type) {
 // 我们将字节码块传入，而编译器会向其中写入代码，如何compile()返回编译是否成功。
 bool compile(const char* source, Chunk* chunk) {
 	initScanner(source);
+
+	Compiler compiler;
+	initCompiler(&compiler);
 
 	compilingChunk = chunk;
 
