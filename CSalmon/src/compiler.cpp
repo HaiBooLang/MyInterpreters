@@ -518,6 +518,79 @@ static void printStatement() {
 	emitByte(OP_PRINT);
 }
 
+static void forStatement() {
+	// 如果for语句声明了一个变量，那么该变量的作用域应该限制在循环体中。我们通过将整个语句包装在一个作用域中来确保这一点。
+	beginScope();
+
+	// 首先是一堆强制性的标点符号。然后我们编译主体。
+	// 与while循环一样，我们在主体的顶部记录字节码的偏移量，并在之后生成一个循环指令跳回该位置。
+	consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+	// 语法有点复杂，因为我们允许出现变量声明或表达式。我们通过是否存在var关键字来判断是哪种类型。
+	// 对于表达式，我们调用expressionStatement()而不是expression()。
+	// 它会查找分号（我们这里也需要一个分号），并生成一个OP_POP指令来丢弃表达式的值。我们不希望初始化器在堆栈中留下任何东西。
+	if (match(TOKEN_SEMICOLON)) {
+		// No initializer.
+	}
+	else if (match(TOKEN_VAR)) {
+		varDeclaration();
+	}
+	else {
+		expressionStatement();
+	}
+	int loopStart = currentChunk()->count;
+
+	// 接下来，是可以用来退出循环的条件表达式。
+	// 因为子句是可选的，我们需要查看它是否存在。
+	// 如果子句被省略，下一个标识一定是分号，所以我们通过查找分号来进行判断。如果没有分号，就一定有一个条件表达式。
+	// 在这种情况下，我们对它进行编译。然后，就像while一样，我们生成一个条件跳转指令，如果条件为假则退出循环。
+	// 因为跳转指令将值留在了栈上，我们在执行主体之前将值弹出。
+	int exitJump = -1;
+	if (!match(TOKEN_SEMICOLON)) {
+		expression();
+		consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+
+		// Jump out of the loop if the condition is false.
+		exitJump = emitJump(OP_JUMP_IF_FALSE);
+		emitByte(OP_POP); // Condition.
+	}
+
+	// 我把非常复杂的增量子句部分留到最后。从文本上看，它出现在循环主体之前，但却是在主体之后执行。
+	// 不幸的是，我们不能稍后再编译增量子句，因为我们的编译器只对代码做了一次遍历。
+	// 相对地，我们会跳过增量子句，运行主体，跳回增量子句，运行它，然后进入下一个迭代。
+	// 同样，它也是可选的。因为这是最后一个子句，下一个标识是右括号。
+	if (!match(TOKEN_RIGHT_PAREN)) {
+		// 	// 当存在增加子句时，我们需要立即编译它，但是它还不应该执行。
+		// 因此，首先我们生成一个无条件跳转指令，该指令会跳过增量子句的代码进入循环体中。
+		int bodyJump = emitJump(OP_JUMP);
+		// 接下来，我们编译增量表达式本身。这通常是一个赋值语句。
+		// 不管它是什么，我们执行它只是为了它的副作用，所以我们也生成一个弹出指令丢弃该值。
+		int incrementStart = currentChunk()->count;
+		expression();
+		emitByte(OP_POP);
+		consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+
+		// 最后一部分有点棘手。首先，我们生成一个循环指令。
+		// 这是主循环，会将我们带到for循环的顶部——如果有条件表达式的话，就回在它前面。
+		// 这个循环发生在增量语句之后，因此增量语句是在每次循环迭代结束时执行的。
+		emitLoop(loopStart);
+		// 然后我们更改loopStart，指向增量表达式开始处的偏移量。
+		// 之后，当我们在主体语句结束之后生成循环指令时，就会跳转到增量表达式，而不是像没有增量表达式时那样跳转到循环顶部。
+		loopStart = incrementStart;
+		patchJump(bodyJump);
+	}
+
+	statement();
+	emitLoop(loopStart);
+
+	// 我们只在有条件子句的时候才会这样做。如果没有条件子句，就没有需要修补的跳转指令，堆栈中也没有条件值需要弹出。
+	if (exitJump != -1) {
+		patchJump(exitJump);
+		emitByte(OP_POP); // Condition.
+	}
+
+	endScope();
+}
+
 // 第一个程序会生成一个字节码指令，并为跳转偏移量写入一个占位符操作数。
 // 我们把操作码作为参数传入，因为稍后我们会有两个不同的指令都使用这个辅助函数。
 // 我们使用两个字节作为跳转偏移量的操作数。一个16位的偏移量可以让我们跳转65535个字节的代码，这对于我们的需求来说应该足够了。
@@ -653,6 +726,9 @@ static void statement() {
 	if (match(TOKEN_PRINT)) {
 		printStatement();
 	} 
+	else if (match(TOKEN_FOR)) {
+		forStatement();
+	}
 	else if (match(TOKEN_IF)) {
 		ifStatement();
 	}
