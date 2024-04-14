@@ -94,13 +94,13 @@ typedef struct {
 // 但这意味着要对我们已经写好的代码进行大量无聊的修改，所以这里用一个全局变量代替。
 Compiler* current = NULL;
 
-static void binary(bool canAssign);
-static void literal(bool canAssign);
-static void grouping(bool canAssign);
-static void number(bool canAssign);
-static void string(bool canAssign);
-static void unary(bool canAssign);
-static void variable(bool canAssign);
+//static void binary(bool canAssign);
+//static void literal(bool canAssign);
+//static void grouping(bool canAssign);
+//static void number(bool canAssign);
+//static void string(bool canAssign);
+//static void unary(bool canAssign);
+//static void variable(bool canAssign);
 
 // 你可以看到grouping和unary是如何被插入到它们各自标识类型对应的前缀解析器列中的。
 // 在下一列中，binary被连接到四个算术中缀操作符上。这些中缀操作符的优先级也设置在最后一列。
@@ -131,7 +131,7 @@ public:
 		rules[TOKEN_IDENTIFIER] = { variable, NULL,   PREC_NONE };
 		rules[TOKEN_STRING] = { string,   NULL,   PREC_NONE };
 		rules[TOKEN_NUMBER] = { number,   NULL,   PREC_NONE };
-		rules[TOKEN_AND] = { NULL,     NULL,   PREC_NONE };
+		rules[TOKEN_AND] = { NULL,     and_,   PREC_AND };
 		rules[TOKEN_CLASS] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_ELSE] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_FALSE] = { literal,  NULL,   PREC_NONE };
@@ -139,7 +139,7 @@ public:
 		rules[TOKEN_FUN] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_IF] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_NIL] = { literal,  NULL,   PREC_NONE };
-		rules[TOKEN_OR] = { NULL,     NULL,   PREC_NONE };
+		rules[TOKEN_OR] = { NULL,     or_,    PREC_OR };
 		rules[TOKEN_PRINT] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_RETURN] = { NULL,     NULL,   PREC_NONE };
 		rules[TOKEN_SUPER] = { NULL,     NULL,   PREC_NONE };
@@ -708,6 +708,32 @@ static void unary(bool canAssign) {
 	case TOKEN_MINUS: emitByte(OP_NEGATE); break;
 	default: return; // Unreachable.
 	}
+}
+
+// 在这个方法被调用时，左侧的表达式已经被编译了。这意味着，在运行时，它的值将会在栈顶。
+// 如果这个值为假，我们就知道整个and表达式的结果一定是假，所以我们跳过右边的操作数，将左边的值作为整个表达式的结果。
+// 否则，我们就丢弃左值，计算右操作数，并将它作为整个and表达式的结果。
+static void and_(bool canAssign) {
+	int endJump = emitJump(OP_JUMP_IF_FALSE);
+
+	emitByte(OP_POP);
+	parsePrecedence(PREC_AND);
+
+	patchJump(endJump);
+}
+
+// 在or表达式中，如果左侧值为真，那么我们就跳过右侧的操作数。因此，当值为真时，我们需要跳过。
+// 我们可以添加一条单独的指令，但为了说明编译器如何自由地将语言的语义映射为它想要的任何指令序列，我会使用已有的跳转指令来实现它。
+// 说实话，这并不是最好的方法。（这种方式中）需要调度的指令更多，开销也更大。
+static void or_(bool canAssign) {
+	int elseJump = emitJump(OP_JUMP_IF_FALSE);
+	int endJump = emitJump(OP_JUMP);
+
+	patchJump(elseJump);
+	emitByte(OP_POP);
+
+	parsePrecedence(PREC_OR);
+	patchJump(endJump);
 }
 
 // 这个函数（一旦实现）从当前的标识开始，解析给定优先级或更高优先级的任何表达式。
