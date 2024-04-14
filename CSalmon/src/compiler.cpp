@@ -427,6 +427,25 @@ static void printStatement() {
 	emitByte(OP_PRINT);
 }
 
+// 执行代码块只是意味着一个接一个地执行其中包含的语句，所以不需要编译它们。
+// 从语义上讲，块所做的事就是创建作用域。在我们编译块的主体之前，我们会调用这个函数进入一个新的局部作用域。
+static void beginScope() {
+	current->scopeDepth++;
+}
+
+static void block() {
+	// 它会一直解析声明和语句，直到遇见右括号。就像我们在解析器中的所有循环一样，我们也要检查标识流是否结束。
+	while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+		declaration();
+	}
+
+	consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
+}
+
+static void endScope() {
+	current->scopeDepth--;
+}
+
 // “表达式语句”就是一个表达式后面跟着一个分号。这是在需要语句的上下文中写表达式的方式。
 // 通常来说，这样你就可以调用函数或执行赋值操作以触发其副作用。
 // 从语义上说，表达式语句会对表达式求值并丢弃结果。编译器直接对这种行为进行编码。它会编译表达式，然后生成一条OP_POP指令。
@@ -439,6 +458,11 @@ static void expressionStatement() {
 static void statement() {
 	if (match(TOKEN_PRINT)) {
 		printStatement();
+	}
+	else if (match(TOKEN_LEFT_BRACE)) {
+		beginScope();
+		block();
+		endScope();
 	}
 	else {
 		expressionStatement();
