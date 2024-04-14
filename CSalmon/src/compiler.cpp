@@ -346,8 +346,59 @@ static uint8_t identifierConstant(Token* name) {
 	return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
 }
  
+static bool identifiersEqual(Token* a, Token* b) {
+	// 既然我们知道两个词素的长度，那我们首先检查它。如果长度相同，我们就使用memcmp()检查字符。
+	if (a->length != b->length) return false;
+	return memcmp(a->start, b->start, a->length) == 0;
+}
+
+// 这会初始化编译器变量数组中下一个可用的Local。它存储了变量的名称和持有变量的作用域的深度。
+static void addLocal(Token name) {
+	// 使用局部变量的指令通过槽的索引来引用变量。该索引存储在一个单字节操作数中，这意味着虚拟机一次最多只能支持256个局部变量。
+	// 如果我们试图超过这个范围，不仅不能在运行时引用变量，而且编译器也会覆盖自己的局部变量数组。
+	if (current->localCount == UINT8_COUNT) {
+		error("Too many local variables in function.");
+		return;
+	}
+
+	Local* local = &current->locals[current->localCount++];
+	local->name = name;
+	local->depth = current->scopeDepth;
+}
+
+// 在这里，编译器记录变量的存在。我们只对局部变量这样做，所以如果在顶层全局作用域中，就直接退出。
+// 因为全局变量是后期绑定的，所以编译器不会跟踪它所看到的关于全局变量的声明。
+// 但是对于局部变量，编译器确实需要记住变量的存在。这就是声明的作用——将变量添加到编译器在当前作用域内的变量列表中。
+static void declareVariable() {
+	if (current->scopeDepth == 0) return;
+
+	Token* name = &parser.previous;
+
+	// 局部变量在声明时被追加到数组中，这意味着当前作用域始终位于数组的末端。当我们声明一个新的变量时，我们从末尾开始，反向查找具有相同名称的已有变量。
+	// 如果是当前作用域中找到，我们就报告错误。
+	// 此外，如果我们已经到达了数组开头或另一个作用域中的变量，我们就知道已经检查了当前作用域中的所有现有变量。
+	for (int i = current->localCount - 1; i >= 0; i--) {
+		Local* local = &current->locals[i];
+		if (local->depth != -1 && local->depth < current->scopeDepth) {
+			break;
+		}
+
+		if (identifiersEqual(name, &local->name)) {
+			error("Already a variable with this name in this scope.");
+		}
+	}
+
+	addLocal(*name);
+}
+
 static uint8_t parseVariable(const char* errorMessage) {
 	consume(TOKEN_IDENTIFIER, errorMessage);
+
+	// 首先，我们“声明”这个变量。之后，如果我们在局部作用域中，则退出函数。
+	// 在运行时，不会通过名称查询局部变量。不需要将变量的名称放入常量表中，所以如果声明在局部作用域内，则返回一个假的表索引。
+	declareVariable();
+	if (current->scopeDepth > 0) return 0;
+
 	return identifierConstant(&parser.previous);
 }
 
@@ -355,9 +406,20 @@ static uint8_t parseVariable(const char* errorMessage) {
 // 在基于堆栈的虚拟机中，我们通常是最后发出这条指令。
 // 在运行时，我们首先执行变量初始化器的代码，将值留在栈中。然后这条指令会获取该值并保存起来，以供日后使用。
 static void defineVariable(uint8_t global) {
+	// 如果处于局部作用域内，就需要生成一个字节码来存储局部变量。
+	// 没有代码会在运行时创建局部变量。想想虚拟机现在处于什么状态。
+	// 它已经执行了变量初始化表达式的代码（如果用户省略了初始化，则是隐式的nil），并且该值作为唯一保留的临时变量位于栈顶。
+	// 我们还知道，新的局部变量会被分配到栈顶……这个值已经在那里了。因此，没有什么可做的。临时变量直接成为局部变量。没有比这更有效的方法了。
+	if (current->scopeDepth > 0) {
+		return;
+	}
+
 	emitBytes(OP_DEFINE_GLOBAL, global);
 }
 
+// 变量声明的解析从varDeclaration()开始，并依赖于其它几个函数。
+// 首先，parseVariable()会使用标识符标识作为变量名称，将其词素作为字符串添加到字节码块的常量表中，然后返回它的常量表索引。
+// 接着，在varDeclaration()编译完初始化表达式后，会调用defineVariable()生成字节码，将变量的值存储到全局变量哈希表中。
 static void varDeclaration() {
 	// 关键字后面跟着变量名。它是由parseVariable()编译的。
 	uint8_t global = parseVariable("Expect variable name.");
@@ -443,7 +505,14 @@ static void block() {
 }
 
 static void endScope() {
-	current->scopeDepth--;
+	// 当一个代码块结束时，我们需要让其中的变量安息。
+	// 当我们弹出一个作用域时，后向遍历局部变量数组，查找在刚刚离开的作用域深度上声明的所有变量。我们通过简单地递减数组长度来丢弃它们。
+	// 这里也有一个运行时的因素。局部变量占用了堆栈中的槽位。当局部变量退出作用域时，这个槽就不再需要了，应该被释放。
+	// 因此，对于我们丢弃的每一个变量，我们也要生成一条OP_POP指令，将其从栈中弹出。
+	while (current->localCount > 0 && current->locals[current->localCount - 1].depth > current->scopeDepth) {
+		emitByte(OP_POP);
+		current->localCount--;
+	}
 }
 
 // “表达式语句”就是一个表达式后面跟着一个分号。这是在需要语句的上下文中写表达式的方式。
