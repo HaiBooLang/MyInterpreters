@@ -271,6 +271,12 @@ static InterpretResult run() {
 			if (isFalsey(peek(0))) vm.ip += offset;
 			break;
 		}
+		case OP_LOOP: {
+			// 与OP_JUMP唯一的区别就是这里使用了减法而不是加法。
+			uint16_t offset = READ_SHORT();
+			vm.ip -= offset;
+			break;
+		}
 		case OP_RETURN: {
 			return INTERPRET_OK;
 		}

@@ -94,13 +94,15 @@ typedef struct {
 // 但这意味着要对我们已经写好的代码进行大量无聊的修改，所以这里用一个全局变量代替。
 Compiler* current = NULL;
 
-//static void binary(bool canAssign);
-//static void literal(bool canAssign);
-//static void grouping(bool canAssign);
-//static void number(bool canAssign);
-//static void string(bool canAssign);
-//static void unary(bool canAssign);
-//static void variable(bool canAssign);
+static void binary(bool canAssign);
+static void literal(bool canAssign);
+static void grouping(bool canAssign);
+static void number(bool canAssign);
+static void string(bool canAssign);
+static void unary(bool canAssign);
+static void variable(bool canAssign);
+static void and_(bool canAssign);
+static void or_(bool canAssign);
 
 // 你可以看到grouping和unary是如何被插入到它们各自标识类型对应的前缀解析器列中的。
 // 在下一列中，binary被连接到四个算术中缀操作符上。这些中缀操作符的优先级也设置在最后一列。
@@ -572,6 +574,46 @@ static void ifStatement() {
 	patchJump(elseJump);
 }
 
+// 它生成一条新的循环指令，该指令会无条件地向回跳转给定的偏移量。和跳转指令一样，其后还有一个16位的操作数。
+// 我们计算当前指令到我们想要跳回的loopStart之间的偏移量。+2是考虑到了OP_LOOP指令自身操作数的大小，这个操作数我们也需要跳过。
+// 从虚拟机的角度看，OP_LOOP 和OP_JUMP之间实际上没有语义上的区别。两者都只是在ip上加了一个偏移量。
+// 我们本可以用一条指令来处理这两者，并给该指令传入一个有符号的偏移量操作数。
+// 但我认为，这样做更容易避免手动将一个有符号的16位整数打包到两个字节所需要的烦人的位操作，况且我们有可用的操作码空间，为什么不使用呢？
+static void emitLoop(int loopStart) {
+	emitByte(OP_LOOP);
+
+	int offset = currentChunk()->count - loopStart + 2;
+	if (offset > UINT16_MAX) error("Loop body too large.");
+
+	emitByte((offset >> 8) & 0xff);
+	emitByte(offset & 0xff);
+}
+
+// 它包含两个跳转——一个是有条件的前向跳转，用于在不满足条件的时候退出循环；另一个是在执行完主体代码后的无条件跳转。
+static void whileStatement() {
+	// 们在loopStar中存储字节码块中当前的指令数，作为我们即将编译的条件表达式在字节码中的偏移量。
+	int loopStart = currentChunk()->count;
+
+	// 大部分跟if语句相似——我们编译条件表达式（强制用括号括起来）。之后是一个跳转指令，如果条件为假，会跳过后续的主体语句。
+	// 我们在编译完主体之后对跳转指令进行修补，并注意在每个执行路径上都要弹出栈顶的条件值。与if语句的唯一区别就是循环。
+	consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
+	expression();
+	consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+
+	int exitJump = emitJump(OP_JUMP_IF_FALSE);
+	emitByte(OP_POP);
+	statement();
+
+	// 在主体之后，我们调用这个函数来生成一个“循环”指令。该指令需要知道往回跳多远。
+	// 当向前跳时，我们必须分两个阶段发出指令，因为在发出跳跃指令前，我们不知道要跳多远。
+	// 现在我们没有这个问题了。我们已经编译了要跳回去的代码位置——就在条件表达式之前。
+	// 在执行完while循环后，我们会一直跳到条件表达式之前。这样，我们就可以在每次迭代时都重新对条件表达式求值。
+	emitLoop(loopStart);
+
+	patchJump(exitJump);
+	emitByte(OP_POP);
+}
+
 // 执行代码块只是意味着一个接一个地执行其中包含的语句，所以不需要编译它们。
 // 从语义上讲，块所做的事就是创建作用域。在我们编译块的主体之前，我们会调用这个函数进入一个新的局部作用域。
 static void beginScope() {
@@ -613,6 +655,9 @@ static void statement() {
 	} 
 	else if (match(TOKEN_IF)) {
 		ifStatement();
+	}
+	else if (match(TOKEN_WHILE)) {
+		whileStatement();
 	}
 	else if (match(TOKEN_LEFT_BRACE)) {
 		beginScope();
