@@ -176,6 +176,19 @@ static InterpretResult run() {
 			push(value);
 			break;
 		}
+		case OP_SET_GLOBAL: {
+			ObjString* name = READ_STRING();
+			// 主要的区别在于，当键在全局变量哈希表中不存在时会发生什么。
+			// 如果这个变量还没有定义，对其进行赋值就是一个运行时错误。Lox不做隐式的变量声明。
+			// 另一个区别是，设置变量并不会从栈中弹出值。
+			// 记住，赋值是一个表达式，所以它需要把这个值保留在那里，以防赋值嵌套在某个更大的表达式中。
+			if (tableSet(&vm.globals, name, peek(0))) {
+				tableDelete(&vm.globals, name);
+				runtimeError("Undefined variable '%s'.", name->chars);
+				return INTERPRET_RUNTIME_ERROR;
+			}
+			break;
+		}
 		case OP_EQUAL: {
 			Value b = pop();
 			Value a = pop();

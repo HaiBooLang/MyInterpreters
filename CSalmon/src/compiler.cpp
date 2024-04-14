@@ -42,7 +42,8 @@ typedef enum {
 } Precedence;
 
 // 这个ParseFn类型是一个简单的函数类型定义，这类函数不需要任何参数且不返回任何内容。
-typedef void (*ParseFn)();
+// 我们正向一个解析函数传递参数。但是这些函数是存储在一个函数指令表格中的，所以所有的解析函数需要具有相同的类型。
+typedef void (*ParseFn)(bool canAssign);
 
 // 我们还知道，我们需要一个表格，给定一个标识类型，可以从中找到：
 // 编译以该类型标识为起点的前缀表达式的函数，编译一个左操作数后跟该类型标识的中缀表达式的函数，以及使用该标识作为操作符的中缀表达式的优先级。
@@ -52,13 +53,13 @@ typedef struct {
 	Precedence precedence;
 } ParseRule;
 
-static void grouping();
-static void unary();
-static void binary();
-static void number();
-static void literal();
-static void string();
-static void variable();
+static void binary(bool canAssign);
+static void literal(bool canAssign);
+static void grouping(bool canAssign);
+static void number(bool canAssign);
+static void string(bool canAssign);
+static void unary(bool canAssign);
+static void variable(bool canAssign);
 
 // 你可以看到grouping和unary是如何被插入到它们各自标识类型对应的前缀解析器列中的。
 // 在下一列中，binary被连接到四个算术中缀操作符上。这些中缀操作符的优先级也设置在最后一列。
@@ -255,7 +256,7 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
-static void binary() {
+static void binary(bool canAssign) {
 	// 当前缀解析函数被调用时，前缀标识已经被消耗了。中缀解析函数被调用时，情况更进一步——整个左操作数已经被编译，而随后的中缀操作符也已经被消耗掉。
 	// 首先左操作数已经被编译的事实是很好的。这意味着在运行时，其代码已经被执行了。当它运行时，它产生的值最终进入栈中。而这正是中缀操作符需要它的地方。
 	// 每个二元运算符的右操作数的优先级都比自己高一级。
@@ -283,7 +284,7 @@ static void binary() {
 	}
 }
 
-static void literal() {
+static void literal(bool canAssign) {
 	// 因为parsePrecedence()已经消耗了关键字标识，我们需要做的就是输出正确的指令。我们根据解析出的标识的类型来确定指令。
 	switch (parser.previous.type) {
 	case TOKEN_FALSE: emitByte(OP_FALSE); break;
@@ -293,7 +294,7 @@ static void literal() {
 	}
 }
 
-static void grouping() {
+static void grouping(bool canAssign) {
 	// 我们假定初始的(已经被消耗了。我们递归地调用expression()来编译括号之间的表达式，然后解析结尾的)。
 	// 就后端而言，分组表达式实际上没有任何意义。它的唯一功能是语法上的——它允许你在需要高优先级的地方插入一个低优先级的表达式。
 	// 因此，它本身没有运行时语法，也就不会发出任何字节码。对expression()的内部调用负责为括号内的表达式生成字节码。
@@ -411,30 +412,38 @@ static void statement() {
 }
 
 // 为了编译数值字面量，我们在数组的TOKEN_NUMBER索引处存储一个指向下面函数的指针。
-static void number() {
+static void number(bool canAssign) {
 	// 我们假定数值字面量标识已经被消耗了，并被存储在previous中。我们获取该词素，并使用C标准库将其转换为一个double值。
 	double value = strtod(parser.previous.start, NULL);
 	// 然后我们用下面的函数生成加载该double值的字节码。
 	emitConstant(NUMBER_VAL(value));
 }
 
-static void string() {
+static void string(bool canAssign) {
 	// 这里直接从词素中获取字符串的字符。+1和-2部分去除了开头和结尾的引号。然后，它创建了一个字符串对象，将其包装为一个Value，并塞入常量表中。
 	emitConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
 // 这里会调用与之前相同的identifierConstant()函数，以获取给定的标识符标识，并将其词素作为字符串添加到字节码块的常量表中。
 // 剩下的工作就是生成一条指令，加载具有该名称的全局变量。
-static void namedVariable(Token name) {
+static void namedVariable(Token name, bool canAssign) {
 	uint8_t arg = identifierConstant(&name);
-	emitBytes(OP_GET_GLOBAL, arg);
+	// 在标识符表达式的解析函数中，我们会查找标识符后面的等号。
+	// 如果找到了，我们就不会生成变量访问的代码，我们会编译所赋的值，然后生成一个赋值指令。
+	if (canAssign && match(TOKEN_EQUAL)) {
+		expression();
+		emitBytes(OP_SET_GLOBAL, arg);
+	}
+	else {
+		emitBytes(OP_GET_GLOBAL, arg);
+	}
 }
 
-static void variable() {
-	namedVariable(parser.previous);
+static void variable(bool canAssign) {
+	namedVariable(parser.previous, canAssign);
 }
 
-static void unary() {
+static void unary(bool canAssign) {
 	// 前导的-标识已经被消耗掉了，并被放在parser.previous中。我们从中获取标识类型，以了解当前正在处理的是哪个一元运算符。
 	TokenType operatorType = parser.previous.type;
 
@@ -462,11 +471,22 @@ static void parsePrecedence(Precedence precedence) {
 	}
 
 	// 否则，我们就调用前缀解析函数，让它做自己的事情。该前缀解析器会编译表达式的其余部分，消耗它需要的任何其它标识，然后返回这里。
-	prefixRule();
+	// 我们搞砸了优先级处理，因为variable()没有考虑包含变量的外围表达式的优先级。
+	// 如果变量恰好是中缀操作符的右操作数，或者是一元操作符的操作数，那么这个包含表达式的优先级太高，不允许使用=。
+	// 为了解决这个问题，variable()应该只在低优先级表达式的上下文中寻找并使用=。
+	bool canAssign = precedence <= PREC_ASSIGNMENT;
+	// 我们正向一个解析函数传递参数。但是这些函数是存储在一个函数指令表格中的，所以所有的解析函数需要具有相同的类型。
+	prefixRule(canAssign);
+
 	while (precedence <= getRule(parser.current.type)->precedence) {
 		advance();
 		ParseFn infixRule = getRule(parser.previous.type)->infix;
-		infixRule();
+		infixRule(canAssign);
+	}
+
+	// 如果=没有作为表达式的一部分被消耗，那么其它任何东西都不会消耗它。这是一个错误，我们应该报告它。
+	if (canAssign && match(TOKEN_EQUAL)) {
+		error("Invalid assignment target.");
 	}
 }
 
