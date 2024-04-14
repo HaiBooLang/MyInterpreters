@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <vector>
 
 #include "common.h"
@@ -24,11 +25,6 @@ typedef struct {
 	// 我们在C语言中没有异常。相反，我们会做一些欺骗性行为。我们添加一个标志来跟踪当前是否在紧急模式中。
 	bool panicMode;
 } Parser;
-
-// 如果我们是有原则的工程师，我们应该给前端的每个函数添加一个参数，接受一个指向Compiler的指针。
-// 我们在一开始就创建一个Compiler，并小心地在将它贯穿于每个函数的调用中……
-// 但这意味着要对我们已经写好的代码进行大量无聊的修改，所以这里用一个全局变量代替。
-Compiler* current = NULL;
 
 // 为了把“优先级”作为一个参数，我们用数值来定义它。
 // 这些是Salmon中的所有优先级，按照从低到高的顺序排列。由于C语言会隐式地为枚举赋值连续递增的数字，这就意味着PREC_CALL在数值上比PREC_UNARY要大。
@@ -79,6 +75,11 @@ typedef struct {
 	// 0是全局作用域，1是第一个顶层块，2是它内部的块，你懂的。我们用它来跟踪每个局部变量属于哪个块，这样当一个块结束时，我们就知道该删除哪些局部变量。
 	int scopeDepth;
 } Compiler;
+
+// 如果我们是有原则的工程师，我们应该给前端的每个函数添加一个参数，接受一个指向Compiler的指针。
+// 我们在一开始就创建一个Compiler，并小心地在将它贯穿于每个函数的调用中……
+// 但这意味着要对我们已经写好的代码进行大量无聊的修改，所以这里用一个全局变量代替。
+Compiler* current = NULL;
 
 static void binary(bool canAssign);
 static void literal(bool canAssign);
@@ -363,7 +364,11 @@ static void addLocal(Token name) {
 
 	Local* local = &current->locals[current->localCount++];
 	local->name = name;
-	local->depth = current->scopeDepth;
+	// 一旦变量声明开始——换句话说，在它的初始化式之前——名称就会在当前作用域中声明。变量存在，但处于特殊的“未初始化”状态。
+	// 然后我们编译初始化式。如果在表达式中的任何一个时间点，我们解析了一个指向该变量的标识符，我们会发现它还没有初始化，并报告错误。
+	// 在我们完成初始化表达式的编译之后，把变量标记为已初始化并可供使用。
+	// 为了实现这一点，当声明一个局部变量时，我们需要以某种方式表明“未初始化”状态。相对地，我们将变量的作用域深度设置为一个特殊的哨兵值-1。
+	local->depth = -1;
 }
 
 // 在这里，编译器记录变量的存在。我们只对局部变量这样做，所以如果在顶层全局作用域中，就直接退出。
@@ -402,6 +407,11 @@ static uint8_t parseVariable(const char* errorMessage) {
 	return identifierConstant(&parser.previous);
 }
 
+// 所这就是编译器中“声明”和“定义”变量的真正含义。“声明”是指变量被添加到作用域中，而“定义”是变量可以被使用的时候。
+static void markInitialized() {
+	current->locals[current->localCount - 1].depth = current->scopeDepth;
+}
+
 // 它会输出字节码指令，用于定义新变量并存储其初始化值。变量名在常量表中的索引是该指令的操作数。
 // 在基于堆栈的虚拟机中，我们通常是最后发出这条指令。
 // 在运行时，我们首先执行变量初始化器的代码，将值留在栈中。然后这条指令会获取该值并保存起来，以供日后使用。
@@ -411,6 +421,8 @@ static void defineVariable(uint8_t global) {
 	// 它已经执行了变量初始化表达式的代码（如果用户省略了初始化，则是隐式的nil），并且该值作为唯一保留的临时变量位于栈顶。
 	// 我们还知道，新的局部变量会被分配到栈顶……这个值已经在那里了。因此，没有什么可做的。临时变量直接成为局部变量。没有比这更有效的方法了。
 	if (current->scopeDepth > 0) {
+		// 稍后，一旦变量的初始化式编译完成，我们将其标记为已初始化。
+		markInitialized();
 		return;
 	}
 
@@ -480,6 +492,8 @@ static void declaration() {
 	if (parser.panicMode) synchronize();
 }
 
+//Statement----------------------------------------------------------------
+
 static void printStatement() {
 	// print语句会对表达式求值并打印出结果，所以我们首先解析并编译这个表达式。
 	expression();
@@ -538,6 +552,8 @@ static void statement() {
 	}
 }
 
+//Statement---------------------------------------------------------------- 
+
 // 为了编译数值字面量，我们在数组的TOKEN_NUMBER索引处存储一个指向下面函数的指针。
 static void number(bool canAssign) {
 	// 我们假定数值字面量标识已经被消耗了，并被存储在previous中。我们获取该词素，并使用C标准库将其转换为一个double值。
@@ -551,18 +567,54 @@ static void string(bool canAssign) {
 	emitConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
+static int resolveLocal(Compiler* compiler, Token* name) {
+	// 我们会遍历当前在作用域内的局部变量列表。如果有一个名称与标识符相同，则标识符一定指向该变量。我们已经找到了它！
+	// 我们后向遍历数组，这样就能找到最后一个带有该标识符的已声明变量。这可以确保内部的局部变量能正确地遮蔽外围作用域中的同名变量。
+	for (int i = compiler->localCount - 1; i >= 0; i--) {
+		Local* local = &compiler->locals[i];
+		if (identifiersEqual(name, &local->name)) {
+			// 当解析指向局部变量的引用时，我们会检查作用域深度，看它是否被完全定义。
+			// 如果变量的深度是哨兵值，那这一定是在变量自身的初始化式中对该变量的引用，我们会将其报告为一个错误。
+			if (local->depth == -1) {
+				error("Can't read local variable in its own initializer.");
+			}
+			// 在运行时，我们使用栈中槽索引来加载和存储局部变量，因此编译器在解析变量之后需要计算索引。
+			// 每当一个变量被声明，我们就将它追加到编译器的局部变量数组中。这意味着第一个局部变量在索引0的位置，下一个在索引1的位置，以此类推。
+			// 换句话说，编译器中的局部变量数组的布局与虚拟机堆栈在运行时的布局完全相同。变量在局部变量数组中的索引与其在栈中的槽位相同。
+			return i;
+		}
+	}
+
+	// 如果我们在整个数组中都没有找到具有指定名称的变量，那它肯定不是局部变量。在这种情况下，我们返回-1，表示没有找到，应该假定它是一个全局变量。
+	return -1;
+}
+
 // 这里会调用与之前相同的identifierConstant()函数，以获取给定的标识符标识，并将其词素作为字符串添加到字节码块的常量表中。
 // 剩下的工作就是生成一条指令，加载具有该名称的全局变量。
 static void namedVariable(Token name, bool canAssign) {
-	uint8_t arg = identifierConstant(&name);
+	// 我们不对变量访问和赋值对应的字节码指令进行硬编码，而是使用了一些C变量。
+	// 首先，我们尝试查找具有给定名称的局部变量，如果我们找到了，就使用处理局部变量的指令。
+	// 否则，我们就假定它是一个全局变量，并使用现有的处理全局变量的字节码。
+	uint8_t getOp, setOp;
+	int arg = resolveLocal(current, &name);
+	if (arg != -1) {
+		getOp = OP_GET_LOCAL;
+		setOp = OP_SET_LOCAL;
+	}
+	else {
+		arg = identifierConstant(&name);
+		getOp = OP_GET_GLOBAL;
+		setOp = OP_SET_GLOBAL;
+	}
+
 	// 在标识符表达式的解析函数中，我们会查找标识符后面的等号。
 	// 如果找到了，我们就不会生成变量访问的代码，我们会编译所赋的值，然后生成一个赋值指令。
 	if (canAssign && match(TOKEN_EQUAL)) {
 		expression();
-		emitBytes(OP_SET_GLOBAL, arg);
+		emitBytes(setOp, (uint8_t)arg);
 	}
 	else {
-		emitBytes(OP_GET_GLOBAL, arg);
+		emitBytes(getOp, (uint8_t)arg);
 	}
 }
 

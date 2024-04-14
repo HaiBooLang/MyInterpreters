@@ -162,6 +162,19 @@ static InterpretResult run() {
 			break;
 		}
 		case OP_POP:		pop(); break;
+		case OP_GET_LOCAL: {
+			// 它接受一个单字节操作数，用作局部变量所在的栈槽。它从索引处加载值，然后将其压入栈顶，在后面的指令可以找到它。
+			uint8_t slot = READ_BYTE();
+			push(vm.stack[slot]);
+			break;
+		}
+		case OP_SET_LOCAL: {
+			// 它从栈顶获取所赋的值，然后存储到与局部变量对应的栈槽中。注意，它不会从栈中弹出值。
+			// 请记住，赋值是一个表达式，而每个表达式都会产生一个值。赋值表达式的值就是所赋的值本身，所以虚拟机要把值留在栈上。
+			uint8_t slot = READ_BYTE();
+			vm.stack[slot] = peek(0);
+			break;
+		}
 		case OP_GET_GLOBAL: {
 			// 我们从指令操作数中提取常量表索引并获得变量名称。然后我们使用它作为键，在全局变量哈希表中查找变量的值。
 			ObjString* name = READ_STRING();

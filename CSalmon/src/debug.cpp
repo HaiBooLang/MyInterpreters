@@ -26,6 +26,14 @@ static int simpleInstruction(const char* name, int offset) {
 	return offset + 1;
 }
 
+// 译器将局部变量编译为直接的槽访问。局部变量的名称永远不会离开编译器，根本不可能进入字节码块。
+// 这对性能很好，但对内省(自我观察)来说就不那么好了。当我们反汇编这些指令时，我们不能像全局变量那样使用变量名称。相反，我们只显示槽号。
+static int byteInstruction(const char* name, Chunk* chunk, int offset) {
+	uint8_t slot = chunk->code[offset + 1];
+	printf("%-16s %4d\n", name, slot);
+	return offset + 2;
+}
+
 int disassembleInstruction(Chunk* chunk, int offset) {
 	// 首先，它会打印给定指令的字节偏移量——这能告诉我们当前指令在字节码块中的位置。当我们在字节码中实现控制流和跳转时，这将是一个有用的路标。
 	printf("%04d ", offset);
@@ -52,6 +60,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
 		return simpleInstruction("OP_FALSE", offset);
 	case OP_POP:
 		return simpleInstruction("OP_POP", offset);
+	case OP_GET_LOCAL:
+		return byteInstruction("OP_GET_LOCAL", chunk, offset);
+	case OP_SET_LOCAL:
+		return byteInstruction("OP_SET_LOCAL", chunk, offset);
 	case OP_GET_GLOBAL:
 		return constantInstruction("OP_GET_GLOBAL", chunk, offset);
 	case OP_SET_GLOBAL:
