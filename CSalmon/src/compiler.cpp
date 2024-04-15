@@ -67,6 +67,11 @@ typedef struct {
 	Precedence precedence;
 } ParseRule;
 
+typedef enum {
+	TYPE_FUNCTION,
+	TYPE_SCRIPT
+} FunctionType;
+
 // 我们存储变量的名称。当我们解析一个标识符时，会将标识符的词素与每个局部变量名称进行比较，以找到一个匹配项。
 typedef struct {
 	Token name;
@@ -81,6 +86,14 @@ typedef struct {
 // 由于我们用来编码局部变量的指令操作数是一个字节，所以我们的虚拟机对同时处于作用域内的局部变量的数量有一个硬性限制。
 // 这意味着我们也可以给局部变量数组一个固定的大小。
 typedef struct {
+	// 现在，我们的编译器假定它总会编译到单个字节码块中。由于每个函数的代码都位于不同的字节码块，这就变得更加复杂了。
+	// 当编译器碰到函数声明时，需要在编译函数主体时将代码写入函数自己的字节码块中。
+	// 在函数主体的结尾，编译器需要返回到它之前正处理的前一个字节码块。
+	// 这对于函数主体内的代码来说很好，但是对于不在其中的代码呢？Lox程序的“顶层”也是命令式代码，而且我们需要一个字节码块来编译它。
+	// 我们也可以将顶层代码放入一个自动定义的函数中，从而简化编译器和虚拟机的工作。
+	// 这样一来，编译器总是在某种函数主体内，而虚拟机总是通过调用函数来运行代码。
+	ObjFunction* function;
+	FunctionType type;
 	Local locals[UINT8_COUNT];
 	// localCount字段记录了作用域中有多少局部变量——有多少个数组槽在使用。
 	int localCount;
@@ -93,6 +106,11 @@ typedef struct {
 // 我们在一开始就创建一个Compiler，并小心地在将它贯穿于每个函数的调用中……
 // 但这意味着要对我们已经写好的代码进行大量无聊的修改，所以这里用一个全局变量代替。
 Compiler* current = NULL;
+
+// 当前的字节码块一定是我们正在编译的函数所拥有的块。
+static Chunk* currentChunk() {
+	return &current->function->chunk;
+}
 
 static void binary(bool canAssign);
 static void literal(bool canAssign);
@@ -284,20 +302,35 @@ static void emitConstant(Value value) {
 }
 
 // 当我们第一次启动虚拟机时，我们会调用它使所有东西进入一个干净的状态。
-static void initCompiler(Compiler* compiler) {
+static void initCompiler(Compiler* compiler, FunctionType type) {
+	compiler->function = NULL;
+	compiler->type = type;
 	compiler->localCount = 0;
 	compiler->scopeDepth = 0;
+	// 在编译器中创建ObjFunction可能看起来有点奇怪。函数对象是一个函数的运行时表示，但这里我们是在编译时创建它。
+	// 我们可以这样想：函数类似于一个字符串或数字字面量。它在编译时和运行时之间形成了一座桥梁。
+	// 当我们碰到函数声明时，它们确实是字面量——它们是一种生成内置类型值的符号。因此，编译器在编译期间创建函数对象。然后，在运行时，它们被简单地调用。
+	compiler->function = newFunction();
 	current = compiler;
+
+	// 编译器的locals数组记录了哪些栈槽与哪些局部变量或临时变量相关联。
+	// 从现在开始，编译器隐式地要求栈槽0供虚拟机自己内部使用。我们给它一个空的名称，这样用户就不能向一个指向它的标识符写值。
+	Local* local = &current->locals[current->localCount++];
+	local->depth = 0;
+	local->name.start = "";
+	local->name.length = 0;
 }
 
-static void endCompiler() {
+static ObjFunction* endCompiler() {
 	emitReturn();
+	ObjFunction* function = current->function;
 #ifdef DEBUG_PRINT_CODE
 	// 只有在代码没有错误的情况下，我们才会这样做。
 	if (!parser.hadError) {
-		disassembleChunk(currentChunk(), "code");
+		disassembleChunk(currentChunk(), function->name != NULL ? function->name->chars : "<script>");
 	}
 #endif
+	return function;
 }
 
 static void expression();
@@ -894,11 +927,11 @@ static ParseRule* getRule(TokenType type) {
 }
 
 // 我们将字节码块传入，而编译器会向其中写入代码，如何compile()返回编译是否成功。
-bool compile(const char* source, Chunk* chunk) {
+ObjFunction* compile(const char* source, Chunk* chunk) {
 	initScanner(source);
 
 	Compiler compiler;
-	initCompiler(&compiler);
+	initCompiler(&compiler, TYPE_SCRIPT);
 
 	compilingChunk = chunk;
 
@@ -915,6 +948,7 @@ bool compile(const char* source, Chunk* chunk) {
 
 	endCompiler();
 
-	// 如果发生错误，compile()应该返回false。
-	return !parser.hadError;
+	// 我们从编译器获取函数对象。如果没有编译错误，就返回它。否则，我们通过返回NULL表示错误。这样，虚拟机就不会试图执行可能包含无效字节码的函数。
+	ObjFunction* function = endCompiler();
+	return parser.hadError ? NULL : function;
 }

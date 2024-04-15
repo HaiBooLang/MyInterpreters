@@ -93,6 +93,10 @@ ObjString* copyString(const char* chars, int length) {
 
 static void printFunction(ObjFunction* function) {
 	// 既然函数知道它的名称，那就应该说出来。
+	if (function->name == NULL) {
+		printf("<script>");
+		return;
+	}
 	printf("<fn %s>", function->name->chars);
 }
 
